@@ -1,0 +1,27 @@
+```{r}
+library(tidyverse)
+```
+
+```{r}
+teams <- read_csv("https://raw.githubusercontent.com/dwillis/NCAAWomensVolleyballData/main/data/ncaa_womens_volleyball_matchstats_2024.csv")
+```
+
+```{r}
+team_totals <- teams |> 
+  mutate(block_totals = block_solos + (block_assists *0.5)) |> 
+  group_by(team) |> 
+  summarise(kills_avg = mean(kills),
+            aces_avg = mean(aces),
+            digs_avg = mean(digs),
+            assists_avg = mean(assists),
+            blocks_avg = mean(block_totals),
+            errors_avg = mean(errors),
+            sets_avg = mean(s),
+            score_diff_avg = mean(team_score - opponent_score),
+            serve_err_avg = mean(s_err),
+            hit_pct_avg = mean(hit_pct),
+            def_hit_pct_avg = mean(defensive_hit_pct),
+            total_attacks_avg = mean(total_attacks)
+  )
+
+```

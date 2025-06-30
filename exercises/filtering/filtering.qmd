@@ -56,7 +56,7 @@ attendance |> filter(Institution == "Maryland")
 Or if we want to see schools that had more than half a million people buy tickets to a football game last season, we do the following. NOTE THE BACKTICKS.
 
 ```{r}
-attendance |> filter(`2022` >= 500000) 
+attendance |> filter(`2024` >= 500000) 
 ```
 
 But what if we want to see all of the Power Five conferences? We *could* use conditional logic in our filter. The conditional logic operators are `|` for OR and `&` for AND. NOTE: AND means all conditions have to be met. OR means any of the conditions work. So be careful about boolean logic.
@@ -86,7 +86,7 @@ attendance |> filter(Conference %in% powerfive)
 So now we have our Power Five list. What if we just wanted to see attendance from the most recent season and ignore all the rest? Select to the rescue.
 
 ```{r}
-attendance |> filter(Conference %in% powerfive) |> select(Institution, Conference, `2022`)
+attendance |> filter(Conference %in% powerfive) |> select(Institution, Conference, `2024`)
 ```
 
 If you have truly massive data, Select has tools to help you select fields that start_with the same things or ends with a certain word. [The documentation will guide you](https://dplyr.tidyverse.org/reference/select.html) if you need those someday. For 90 plus percent of what we do, just naming the fields will be sufficient.
@@ -104,7 +104,7 @@ library(downloadthis)
 library(glue)
 
 dllink <- download_link(
-  link = "https://dwillis.github.io/sports-data-files/players23.csv",
+  link = "https://dwillis.github.io/sports-data-files/players25.csv",
   button_label = "Download csv file",
   button_type = "danger",
   has_icon = TRUE,
@@ -119,7 +119,7 @@ glue("<pre><p><strong>For this walkthrough:</strong></p><p>{dllink}</p></pre>")
 Let's get set up similar to the previous chapter.
 
 ```{r}
-players <- read_csv("data/players23.csv")
+players <- read_csv("data/players25.csv")
 
 players |>
   mutate(trueshooting = (PTS/(2*(FGA + (.44*FTA))))*100) |>
@@ -135,7 +135,7 @@ players |>
   mutate(trueshooting = (PTS/(2*(FGA + (.44*FTA))))*100) |>
   arrange(desc(trueshooting)) |>
   filter(MP > 300) |> 
-  filter(Team == "Maryland Terrapins")
+  filter(Team == "Maryland Terrapins Men's")
 ```
 
 **ANSWER** Who do you get as the first result, and what was his trueshooting percentage?
@@ -150,7 +150,7 @@ One last little dplyr trick that's nice to have in the toolbox is a shortcut for
 So what are the top 10 Power Five schools by season attendance. All we're doing here is chaining commands together with what we've already got. We're *filtering* by our list of Power Five conferences, we're *selecting* the three fields we need, now we're going to *arrange* it by total attendance and then we'll introduce the new function: `top_n`. The `top_n` function just takes a number. So we want a top 10 list? We do it like this:
 
 ```{r}
-attendance |> filter(Conference %in% powerfive) |> select(Institution, Conference, `2022`) |> arrange(desc(`2022`)) |> top_n(10)
+attendance |> filter(Conference %in% powerfive) |> select(Institution, Conference, `2024`) |> arrange(desc(`2024`)) |> top_n(10)
 ```
 
 That's all there is to it. Just remember -- for it to work correctly, you need to sort your data BEFORE you run top_n. Otherwise, you're just getting the first 10 values in the list. The function doesn't know what field you want the top values of. You have to do it.
@@ -160,13 +160,13 @@ That's all there is to it. Just remember -- for it to work correctly, you need t
 Let's return to our women's soccer data. I've updated the data through Sept. 4, so we've got more matches now. Let's load it:
 
 ```{r}
-matches_2023 <- read_csv("https://raw.githubusercontent.com/dwillis/NCAAWomensSoccerData/main/data/ncaa_womens_soccer_matchstats_2023.csv")
+matches_2025 <- read_csv("https://raw.githubusercontent.com/dwillis/NCAAWomensSoccerData/main/data/ncaa_womens_soccer_matchstats_2025.csv")
 ```
 
 Now, let's generate total shot attempts and total shots on goal for just Maryland, using `filter()`. You can put the filter before or after your `group_by()` and `summarize()` lines, but general practice is to put it before. That way you can test it out before doing anything else.
 
 ```{r}
-matches_2023 |>
+matches_2025 |>
   filter(team == 'Maryland Terrapins, Terps') |>
   group_by(team) |>
   summarise(
@@ -175,7 +175,7 @@ matches_2023 |>
     percent = (total_on_goal/total_attempts)*100
   )
 ```
-Now it's your turn: do the same for the 2022 data. Load it from GitHub, then adapt the above code but add an additional filter to restrict the results to Maryland's first five games (the 5th game was on Sept. 4, 2022). You need to put the date value in quotes.
+Now it's your turn: do the same for the 2024 data. Load it from GitHub, then adapt the above code but add an additional filter to restrict the results to Maryland's first six games (the 6th game was on Sept. 1, 2024). You need to put the date value in quotes in this format: 'yyyy-mm-dd'
 
 ```{r}
 

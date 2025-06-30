@@ -1,4 +1,4 @@
-## NCAA Football Attendance
+## NCAA Football Attendance 
 
 Let's load the tidyverse.
 
@@ -15,30 +15,30 @@ attendance <- read_csv("https://dwillis.github.io/sports-data-files/attendance.c
 Using the tidyverse's `pivot_longer` function, turn the currently wide data into longer data and save it as a new dataframe called `attendance_longer`:
 
 ```{r}
-attendance_longer <- attendance |> pivot_longer(cols = starts_with("20"), names_to = "Year", values_to = "Attendance")
-
-attendance_longer |> filter(Attendance >= 500000)
-
+attendance_longer <- attendance |> 
 ```
 
-Let's try to figure out whether football attendance has returned to "normal" by 2023, defining "normal" as 2019 figures. For that we'll need to isolate those two years using `filter()` and get rid of any NAs:
+Let's try to figure out whether football attendance has returned to "normal" by 2024, defining "normal" as 2019 figures. For that we'll need to isolate those two years using `filter()` and get rid of any NAs:
 
 ```{r}
-attendance_two_years <- attendance_longer |> filter(Year %in% c(2019, 2023)) |> na.omit()
+attendance_two_years <- attendance_longer |> filter()
 ```
 
 Now, in order to calculate a percentage change between those two years, we'll need to go back to wider data and again ditch teams where we don't have both years:
 
 ```{r}
-attendance_wide <- attendance_two_years |> pivot_wider(names_from = Year, values_from = Attendance) |> na.omit()
+attendance_wide <- attendance_two_years |> pivot_wider()
 ```
 
 Finally, we'll add a percentage change column to that dataframe (remember, it's (New-Old)/Old) and arrange it to see the results.
 
 ```{r}
-attendance_wide <- attendance_wide |> mutate(percent = (`2023`-`2019`)/`2019`*100)
+attendance_wide <- attendance_wide |> mutate()
 ```
 
 Some of these clearly are influenced by performance on the field. Below, describe the most interesting results (positive or negative) and what you think might be going on with them. Feel free to do some googling and describe what other data would be helpful to clarify what the best stories here might be. What surprises you about these results?
 
 **ANSWER**
+
+
+
