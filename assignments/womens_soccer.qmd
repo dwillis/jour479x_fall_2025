@@ -2,7 +2,7 @@
 title: "Women's Soccer Data"
 ---
 
-We'll use this notebook to explore some NCAA women's soccer data and [our questions](https://docs.google.com/spreadsheets/d/1kTSrnl1URmcexIWLDMWqDnp3q-c2OS45uifnhjp10n4/edit#gid=0). First, let's load the tidyverse library:
+We'll use this notebook to explore some NCAA women's soccer data and [our questions](https://docs.google.com/spreadsheets/d/1G1AjH2iS6kj3kKHCRi0XVy5Lcm-rahJkeTAToVh9J1g/edit?gid=0#gid=0). First, let's load the tidyverse library:
 
 ```{r}
 library(tidyverse)
