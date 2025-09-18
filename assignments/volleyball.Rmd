@@ -1,27 +1,142 @@
+# NCAA Women's Volleyball Statistical Analysis Exercise: 2024 vs 2025
+
+## Step 1: Load Required Libraries and Data
+
+
 ```{r}
 library(tidyverse)
 ```
 
-```{r}
-teams <- read_csv("https://raw.githubusercontent.com/dwillis/NCAAWomensVolleyballData/main/data/ncaa_womens_volleyball_matchstats_2024.csv")
-```
 
 ```{r}
-team_totals <- teams |> 
-  mutate(block_totals = block_solos + (block_assists *0.5)) |> 
-  group_by(team) |> 
-  summarise(kills_avg = mean(kills),
-            aces_avg = mean(aces),
-            digs_avg = mean(digs),
-            assists_avg = mean(assists),
-            blocks_avg = mean(block_totals),
-            errors_avg = mean(errors),
-            sets_avg = mean(s),
-            score_diff_avg = mean(team_score - opponent_score),
-            serve_err_avg = mean(s_err),
-            hit_pct_avg = mean(hit_pct),
-            def_hit_pct_avg = mean(defensive_hit_pct),
-            total_attacks_avg = mean(total_attacks)
+matches24 <- read_csv("https://raw.githubusercontent.com/dwillis/NCAAWomensVolleyballData/main/data/ncaa_womens_volleyball_matchstats_2024.csv")
+
+matches25 <- read_csv("https://raw.githubusercontent.com/dwillis/NCAAWomensVolleyballData/main/data/ncaa_womens_volleyball_matchstats_2025.csv")
+
+```
+
+## Step 2: Explore Maryland's Aces Performance
+
+Let's examine how Maryland's serving (measured by aces) varied by match outcome across both seasons.
+
+```{r}
+# 2024 Maryland aces by match result
+matches24 |>
+  filter(team == 'Maryland') |>
+  group_by(result) |>
+  summarise(
+    avg_aces = mean(aces),
+    median_aces = median(aces),
+    matches = n()
   )
-
 ```
+
+```{r}
+# 2025 Maryland aces by match result  
+matches25 |>
+  filter(team == 'Maryland') |>
+  group_by(result) |>
+  summarise(
+    avg_aces = mean(aces, na.rm = TRUE),
+    median_aces = median(aces, na.rm = TRUE),
+    matches = n()
+  )
+```
+
+**Question 1:** 
+- How did their ace performance change between 2024 and 2025?
+- Did Maryland serve more aces in wins or losses in each season? 
+- What might explain any differences you observe? You can do some research for this.
+
+YOUR ANSWERS HERE
+
+## Step 3: Prepare Data for Statistical Testing
+
+Let's test out whether there is a significant difference in average aces per match between the two seasons. First, we need to isolate Maryland's data and add a season identifier.
+
+```{r}
+umd_aces24 <- matches24 |> 
+  filter(team == 'Maryland') |> 
+  mutate(season = 2024)
+
+umd_aces25 <- matches25 |> 
+  filter(team == 'Maryland') |> 
+  mutate(season = 2025)
+```
+
+Let's examine the distributions before testing:
+
+```{r}
+# Create side-by-side boxplots
+combined_preview <- bind_rows(umd_aces24, umd_aces25)
+
+ggplot(combined_preview, aes(x = factor(season), y = aces)) +
+  geom_boxplot() +
+  geom_jitter(width = 0.2, alpha = 0.6) +
+  labs(title = "Maryland Aces Distribution by Season",
+       x = "Season", y = "Aces per Match") +
+  theme_minimal()
+```
+
+**Question 2:** Based on the boxplot, what do you notice about the distribution of aces in each season? Do you see any outliers?
+
+YOUR ANSWER HERE
+
+## Step 4: Conduct T-Test for Season Comparison
+
+Let's test out whether there's a significant difference in average aces per match between the two seasons using a t-test.
+
+**Null Hypothesis:** There is no difference in average aces per match between 2024 and 2025.
+**Alternative Hypothesis:** There is a difference in average aces per match between the two seasons.
+
+```{r}
+result <- t.test(umd_aces24$aces, umd_aces25$aces, 
+                alternative = "two.sided", 
+                var.equal = TRUE)
+
+print(result)
+```
+
+**Question 3:** 
+- What is the p-value? Is it statistically significant at α = 0.05?
+- What does the confidence interval tell you?
+- Based on these results, can you reject the null hypothesis? What does this mean in practical terms?
+
+YOUR ANSWERS HERE
+
+## Step 5: Alternative Team Analysis
+
+Let's repeat the analysis for a different team. UTEP had the highest number of aces in 2024 with 263. Has that success continued for the Miners this season?
+
+```{r}
+team_name <- "UTEP"
+
+team_aces24 <- matches24 |> 
+  filter(team == team_name) |> 
+  mutate(season = 2024)
+
+team_aces25 <- matches25 |> 
+  filter(team == team_name) |> 
+  mutate(season = 2025)
+
+# Repeat the t-test
+team_result <- t.test(team_aces24$aces, team_aces25$aces, 
+                     alternative = "two.sided", var.equal = TRUE)
+print(team_result)
+```
+**Question 4:** 
+- What is the p-value? Is it statistically significant at α = 0.05?
+- What do the sample means tell you?
+- Based on these results, can you reject the null hypothesis? What does this mean in practical terms?
+
+YOUR ANSWERS HERE
+
+
+**Final Reflection Questions:**
+1. How do the results for UTEP compare to Maryland's results?
+2. What factors might explain differences in ace performance between seasons for volleyball teams?
+3. What are the limitations of using aces as a measure of team performance?
+4. What columns from the data could you add to your analysis to get a fuller picture of aces' impact?
+
+YOUR ANSWERS HERE
+
