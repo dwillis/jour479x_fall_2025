@@ -296,7 +296,7 @@ Many position titles contain multiple roles. We should extract these:
 ```{r extract-secondary-roles}
 # For compound roles, extract all components
 extract_role_components <- function(title) {
-  if (is.na(title)) return(list(NA_character_))
+  if (is.na(title)) return(NA_character_)
 
   # Split on separators
   roles <- str_split(title, " */ *| *& *| and |, *")[[1]]
@@ -305,18 +305,23 @@ extract_role_components <- function(title) {
   roles <- str_squish(roles)
   roles <- roles[roles != ""]
 
-  list(roles)
+  # Return the character vector (map() will handle the list wrapping)
+  roles
 }
 
 # Example of extracting multiple roles
 positions_with_roles <- positions_standardized |>
   mutate(role_components = map(position_title_original, extract_role_components))
 
-# Show examples
-positions_with_roles |>
-  filter(map_int(role_components, length) > 1) |>
+# Count and show examples of compound roles
+compound_roles <- positions_with_roles |>
+  filter(map_int(role_components, length) > 1)
+
+cat("Found", nrow(compound_roles), "positions with multiple roles\n")
+cat("Examples of compound role titles:\n")
+compound_roles |>
   select(position_title_original, role_components, position_title_standardized) |>
-  head(10)
+  head(20)
 ```
 
 ---
