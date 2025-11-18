@@ -156,6 +156,7 @@ canonical_positions <- tribble(
   "Head Coach", "Primary head coaching role", 1,
   "Interim Head Coach", "Temporary head coaching role", 2,
   "Associate Head Coach", "Second-in-command coaching role", 3,
+  "Assistant Head Coach", "Assistant to head coach role", 3,
   "Assistant Coach", "General assistant coaching role", 4,
   "Lead Assistant Coach", "Senior assistant coaching role", 4,
   "Recruiting Coordinator", "Primary recruiting responsibility", 5,
@@ -261,6 +262,11 @@ test_titles <- c(
   "Women's Basketball Assistant Coach"
 )
 
+cat("Position standardization test:\n")
+tibble(
+  original = test_titles,
+  standardized = sapply(test_titles, standardize_position_title)
+) |> print(n = Inf)
 ```
 
 ### Apply Standardization
@@ -269,7 +275,7 @@ test_titles <- c(
 # Apply standardization to positions
 positions_standardized <- positions_df |>
   mutate(
-    position_title_standardized = standardize_position_title(position_title),
+    position_title_standardized = sapply(position_title, standardize_position_title),
     position_title_original = position_title
   )
 
@@ -530,8 +536,8 @@ test_colleges <- c(
 cat("College standardization examples:\n")
 tibble(
   original = test_colleges,
-  standardized = standardize_college_name(test_colleges)
-)
+  standardized = sapply(test_colleges, standardize_college_name)
+) |> print(n = Inf)
 ```
 
 ### Apply College Standardization
@@ -540,14 +546,14 @@ tibble(
 # Standardize position colleges
 positions_final <- positions_standardized |>
   mutate(
-    position_college_standardized = standardize_college_name(position_college),
+    position_college_standardized = sapply(position_college, standardize_college_name),
     position_college_original = position_college
   )
 
 # Standardize education colleges
 education_final <- education_df |>
   mutate(
-    education_college_standardized = standardize_college_name(education_college),
+    education_college_standardized = sapply(education_college, standardize_college_name),
     education_college_original = education_college
   )
 
@@ -578,7 +584,7 @@ The current mapping is a **starter template**. You should:
 ```{r expand-mapping-recommendations}
 # Identify the most frequent colleges that need mapping
 colleges_to_map <- position_colleges |>
-  mutate(standardized = standardize_college_name(position_college)) |>
+  mutate(standardized = sapply(position_college, standardize_college_name)) |>
   filter(position_college != standardized |
          str_detect(position_college, " - | A&M |^St\\.|Saint")) |>
   arrange(desc(position_count))
@@ -686,7 +692,7 @@ position_roles_long <- positions_final |>
          position_title_original, position_start, position_end) |>
   mutate(role_components = map(position_title_original, extract_role_components)) |>
   unnest(role_components) |>
-  mutate(role_standardized = standardize_position_title(role_components))
+  mutate(role_standardized = sapply(role_components, standardize_position_title))
 
 cat("Example of multi-role expansion:\n")
 position_roles_long |>
