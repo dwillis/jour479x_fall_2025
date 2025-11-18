@@ -156,7 +156,6 @@ canonical_positions <- tribble(
   "Head Coach", "Primary head coaching role", 1,
   "Interim Head Coach", "Temporary head coaching role", 2,
   "Associate Head Coach", "Second-in-command coaching role", 3,
-  "Assistant Head Coach", "Assistant to head coach role", 3,
   "Assistant Coach", "General assistant coaching role", 4,
   "Lead Assistant Coach", "Senior assistant coaching role", 4,
   "Recruiting Coordinator", "Primary recruiting responsibility", 5,
@@ -303,7 +302,7 @@ extract_role_components <- function(title) {
   roles <- str_split(title, " */ *| *& *| and |, *")[[1]]
 
   # Clean each component
-  roles <- str_trim(roles)
+  roles <- str_squish(roles)
   roles <- roles[roles != ""]
 
   list(roles)
