@@ -2,7 +2,7 @@
 title: "Women's Soccer Data"
 ---
 
-We'll use this notebook to explore some NCAA women's soccer data and [our questions](https://docs.google.com/spreadsheets/d/1kTSrnl1URmcexIWLDMWqDnp3q-c2OS45uifnhjp10n4/edit#gid=0). First, let's load the tidyverse library:
+We'll use this notebook to explore some NCAA women's soccer data and [our questions](https://docs.google.com/spreadsheets/d/1G1AjH2iS6kj3kKHCRi0XVy5Lcm-rahJkeTAToVh9J1g/edit?gid=0#gid=0). First, let's load the tidyverse library:
 
 ```{r}
 library(tidyverse)
@@ -12,7 +12,7 @@ We'll want to start with 2025 match data, which is located in [this GitHub repos
 
 
 ```{r}
-matches_2025 <- read_csv("https://raw.githubusercontent.com/dwillis/NCAAWomensSoccerData/main/data/ncaa_womens_soccer_matchstats_2025.csv")
+matches_2025 <- read_csv("https://raw.githubusercontent.com/dwillis/NCAAWomensSoccerData/main/data/ncaa_womens_soccer_matchstats_2025.csv") |> mutate(diff = team_score - opponent_score, total_goals =  goals + defensive_goals)
 ```
 
 Let's take a look at this data to see what it contains, using `head` and `glimpse`:
@@ -27,29 +27,280 @@ Now, onto the questions using aggregates, which means `group_by` and `summarize`
 1. How many shots in total has Maryland attempted and how many have been on goal? Calculate a percentage of shots on goal.
 
 ```{r}
-
+matches_2025 |> 
+  group_by(team) |> 
+  summarise(
+    total_shots = sum(sh_att),
+    total_sog = sum(so_g),
+    pct_sog = total_sog/total_shots
+  ) |> 
+arrange(desc(pct_sog))
 ```
 
 2. What about the same shot stats from last season's first four games? You'll need to load the matches from 2024 - just change the season in the URL - and filter by date to find the first four games.
 
 ```{r}
+matches_2024 <- read_csv("https://raw.githubusercontent.com/dwillis/NCAAWomensSoccerData/main/data/ncaa_womens_soccer_matchstats_2024.csv") |> mutate(total_goals = goals + defensive_goals) |> filter(date < '2024-09-18') |> filter(team == 'Maryland Terrapins, Terps')
+```
+
+```{r}
+t.test(matches_2024$total_goals, matches_2025$total_goals)
+```
+
+Based on this t-test, I would accept the null hypothesis because the p-value is far above 0.05, meaning the results are not statistically significant. The mean goals scored in games through September 18th in 2024 was 2.92, compared to 2.9 this year, a negligible difference. 
+
+
+```{r}
+matches_2024 <- read_csv("https://raw.githubusercontent.com/dwillis/NCAAWomensSoccerData/main/data/ncaa_womens_soccer_matchstats_2024.csv") |> mutate(total_goals = goals + defensive_goals) |> filter(date < '2024-09-18') |> filter(team == 'Maryland Terrapins, Terps')
+```
+
+```{r}
+matches_2025 <- read_csv("https://raw.githubusercontent.com/dwillis/NCAAWomensSoccerData/main/data/ncaa_womens_soccer_matchstats_2025.csv") |> mutate(total_goals = goals + defensive_goals) |> filter(team == 'Maryland Terrapins, Terps')
+```
+
+```{r}
+t.test(matches_2024$total_goals, matches_2025$total_goals)
+```
+
+The t-test yields similar results for only Maryland games. The p-value is considerably higher than 0.05, and the mean goals scored last year compared to this year are not significantly far apart.
+
+```{r}
+firstfourgames <- c("2024-08-15", "2024-08-18", "2024-08-22", "2024-08-25")
+
+matches_2024 |> 
+  filter(team == "Maryland Terrapins, Terps") |> 
+  filter(date %in% firstfourgames) |> 
+  group_by(team) |> 
+  summarise(
+    total_shots = sum(sh_att),
+    total_sog = sum(so_g),
+    pct_sog = total_sog/total_shots
+  )
 
 ```
+
 
 
 3. Maryland started 2022 with 4 draws. Have any other teams had as many this season?
 
 ```{r}
-
+matches_2025 |> 
+  group_by(team) |> 
+  summarise(
+    total_draws = sum(outcome == "Draw")
+  ) |> 
+arrange(desc(total_draws))
+  
 ```
 
 
 4. How many total corner kicks has Maryland had so far this season and how many have its opponents have? Calculate the difference between the two totals for every team using group_by, summarize and mutate, then filter to find Maryland's totals.
 
 ```{r}
+matches_2025 |> 
+  group_by(team) |>
+  mutate(corners_diff = corners - defensive_corners) |> 
+  summarise(total_corners_diff = sum(corners_diff)
+              ) |> 
+filter(team == "Maryland Terrapins, Terps")
+```
 
+```{r}
+swac_teams <- c("Alabama A&M Bulldogs", "Alabama St. Lady Hornets", "Alcorn Lady Braves", "Ark.-Pine Bluff Lady Lions", "Grambling Lady Tigers", "Jackson St. Lady Tigers", "Mississippi Val. Devilettes", "Prairie View Lady Panthers", "Southern U. Lady Jaguars", "Texas Southern Lady Tigers")
+
+swac_matches <- matches_2025 |> 
+  filter(team %in% swac_teams)
+
+matches_2025 |> 
+  summarise(
+    mean_diff = mean(diff),
+    mean_opp_goals = mean(defensive_goals),
+    mean_sog = mean(so_g),
+    mean_opp_sog = mean(defensive_so_g)
+    )
+
+swac_matches |> 
+  summarise(
+    mean_diff = mean(diff),
+    mean_opp_goals = mean(defensive_goals),
+    mean_sog = mean(so_g),
+    mean_opp_sog = mean(defensive_so_g)
+    )
+
+big10 <- c("Nebraska Huskers", "Iowa Hawkeyes", "Minnesota Golden Gophers", "Illinois Fighting Illini", "Northwestern Wildcats", "Wisconsin Badgers", "Indiana Hoosiers", "Purdue Boilermakers", "Ohio St. Buckeyes", "Michigan Wolverines", "Michigan St. Spartans", "Penn St. Nittany Lions", "Rutgers Scarlet Knights", "Maryland Terrapins, Terps", "Southern California Trojans", "UCLA Bruins", "Washington Huskies", "Oregon Ducks")
+
+big10_matches <- matches_2025 |> 
+  filter(team %in% big10)
+
+big10_matches |> 
+  summarise(
+    mean_diff = mean(diff),
+    mean_opp_goals = mean(defensive_goals),
+    mean_sog = mean(so_g),
+    mean_opp_sog = mean(defensive_so_g)
+    )
+
+
+big10_matches |> 
+  filter(team == "Maryland Terrapins, Terps") |> 
+  summarise(
+    mean_diff = mean(diff),
+    mean_opp_goals = mean(defensive_goals),
+    mean_sog = mean(so_g),
+    mean_opp_sog = mean(defensive_so_g)
+    )
+```
+
+
+5. What's the most interesting thing you've seen from these questions?
+
+The most newsworthy statistic I've noticed from these questions is the considerable disparity in shot attempts, shots on goal, and shots on goal percentage for Maryland women's soccer over the first four games of the 2024 season compared to the 2025 season. They've attempted more than double the shots and tallied over twice as many shots on goal this season than they did in 2024. Their shots on goal percentage also increased by two points. 
+
+This could be strong and engaging statistical evidence in a story about the overall difference between the team last year compared to this year. Or, it could illustrate how much more effective the offense has been in head coach Michael Marchiano's first year leading the program.
+
+
+## Correlations and regression
+
+```{r}
+correlations <- read_csv("https://raw.githubusercontent.com/dwillis/NCAAWomensSoccerData/main/data/ncaa_womens_soccer_matchstats_2024.csv")
+
+
+newcorrelations <- correlations |> 
+  mutate(
+    differential = goals - defensive_goals
+    )
+
+newcorrelations |> summarise(correlation = cor(differential, fouls, method="pearson"))
+
+newcorrelations |> summarise(correlation = cor(differential, yellow_cards, method="pearson"))
+
+fit <- lm(differential ~ fouls, data = newcorrelations)
+summary(fit)
+
+newcorrelations |> 
+  summarise(correlation = cor(differential, so_g, method="pearson"))
+
+
+net <- lm(differential ~ so_g, data = newcorrelations)
+summary(net)
 
 ```
 
-5. What's the most interesting thing you've seen from these questions?
+## 2025 version
+
+```{r}
+correlations_2025 <- read_csv("https://raw.githubusercontent.com/dwillis/NCAAWomensSoccerData/main/data/ncaa_womens_soccer_matchstats_2025.csv")
+
+new_correlations_2025 <- correlations_2025 |> mutate(
+  differential = goals - defensive_goals
+)
+
+new_correlations_2025 |> summarise(correlation = cor(differential, corners, method="pearson"))
+
+net <- lm(differential ~ corners, data = new_correlations_2025)
+summary(net)
+
+umd_corner_correlations_2025 <- new_correlations_2025 |> mutate(
+  corner_diff = corners - defensive_corners
+) |> filter(team == "Maryland Terrapins, Terps")
+
+
+umd_corner_correlations_2025 |> mutate(
+  corner_diff_total = sum(corner_diff),
+  differential_total = sum(differential)
+) |> filter(team == "Maryland Terrapins, Terps")
+
+```
+
+## Story Pitch
+
+The outcomes of Maryland women's soccer games have been closely tied to the number of corner kicks they earn and concede to their opponent. The Terps have recorded more corners than their opponents in five of their six wins, while their opponent took more corners than them in all four of their losses. 
+
+Maryland's matches against Saint Francis and Florida are particularly telling. The Gators earned six more corners than Maryland in a decisive win over the Terps. In a 5-0 shellacking of Saint Francis, Maryland recorded six more corners than the Red Flash.
+
+This is supported by a moderately positive correlation between the number of corners a team earns and allows, and the number of goals that team scores and concedes.
+
+
+
+```{r}
+model = lm(diff ~ so_g +  defensive_so_g + assists + defensive_assists, data = matches_2025)
+summary(model)
+```
+
+```{r}
+-0.031347 + 0.127066*(1) - 0.121148*(6) + 0.639814*(0) - 0.633076 * (1)
+```
+
+
+```{r}
+matches_2025 |> 
+  filter(team == "Maryland Terrapins, Terps") |> 
+  summarise(
+    mean_sog = mean(so_g),
+    mean_def_sog = mean(defensive_so_g),
+    mean_assists = mean(assists),
+    mean_def_assists = mean(defensive_assists)
+    )
+```
+
+
+```{r}
+matches_2025 |> 
+  filter(team == "Illinois Fighting Illini") |> 
+  summarise(
+    mean_sog = mean(so_g),
+    mean_def_sog = mean(defensive_so_g),
+    mean_assists = mean(assists),
+    mean_def_assists = mean(defensive_assists)
+    )
+```
+
+```{r}
+-0.031347 + 0.127066*(4.916667) - 0.121148*(6.083333) + 0.639814*(1.166667) - 0.633076 * (1.5)
+```
+
+
+### Step Chart
+
+```{r}
+
+matches_2025 <- read_csv("https://raw.githubusercontent.com/dwillis/NCAAWomensSoccerData/main/data/ncaa_womens_soccer_matchstats_2025.csv")
+
+teams <- matches_2025 |> 
+  distinct(team, team_id) |> 
+  arrange(team)
+
+write_csv(teams, "~/code/mens-soccer/data/input/wsoc_teams.csv")
+
+big10 <- c("Nebraska Huskers", "Iowa Hawkeyes", "Minnesota Golden Gophers", "Illinois Fighting Illini", "Northwestern Wildcats", "Wisconsin Badgers", "Indiana Hoosiers", "Purdue Boilermakers", "Ohio St. Buckeyes", "Michigan Wolverines", "Michigan St. Spartans", "Penn St. Nittany Lions", "Rutgers Scarlet Knights", "Maryland Terrapins, Terps", "Southern California Trojans", "UCLA Bruins", "Washington Huskies", "Oregon Ducks")
+
+diff_2025 <- matches_2025 |> 
+  mutate(diff = team_score - opponent_score) |> 
+  group_by(team) |> 
+  mutate(team_cumulative_diff = cumsum(diff))
+
+big_diff <- diff_2025 |> 
+  filter(team %in% big10)
+
+ggplot() + geom_step(data=big_diff, aes(x=date, y=team_cumulative_diff, group=team, color=team))
+
+umd <- big_diff |> filter(team == "Maryland Terrapins, Terps")
+ill <- big_diff |> filter(team == "Illinois Fighting Illini")
+ind <- big_diff |> filter(team == "Indiana Hoosiers")
+
+
+ggplot() + 
+  geom_step(data=big_diff, aes(x=date, y=team_cumulative_diff, group=team), color="light grey") +
+  geom_step(data=umd, aes(x=date, y=team_cumulative_diff, group=team), color="red") + 
+  geom_step(data=ill, aes(x=date, y=team_cumulative_diff, group=team), color="orange") +
+  labs(
+    x="Date", 
+    y="Cumulative Point Differential", 
+    title="A Tale of Two Programs", 
+    subtitle="Maryland started stronger, but Illinois quickly surpassed the Terps.", 
+    caption="Source: NCAA | By Derek Willis") +
+  theme_minimal()
+
+```
+
 

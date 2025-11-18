@@ -4,6 +4,7 @@ Let's load the tidyverse.
 
 ```{r}
 library(tidyverse)
+library(scales)
 ```
 
 And read in the attendance data:
@@ -40,5 +41,29 @@ Some of these clearly are influenced by performance on the field. Below, describ
 
 **ANSWER**
 
+
+### Bar Charts
+
+```{r}
+top10 <- attendance |> 
+  arrange(desc(`2024`)) |> 
+  top_n(10) |> 
+  select(Institution, `2024`)
+```
+
+```{r}
+ggplot() + 
+  geom_bar(
+    data=top10, 
+    aes(x=reorder(Institution, -`2024`), weight=`2024`)
+  ) + 
+  scale_y_continuous(labels=comma) + 
+  labs(
+    title="Big Ten Schools Lead in Total Attendance", 
+    x="School", 
+    y="Total Attendance"
+  ) + 
+  theme_minimal()
+```
 
 

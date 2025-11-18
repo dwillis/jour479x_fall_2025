@@ -1,0 +1,53 @@
+```{r}
+library(tidyverse)
+```
+
+```{r}
+logs23 <- read_csv("~/code/dwillis.github.io/docs/sports-data-files/footballlogs23.csv")
+logs24 <- read_csv("~/code/dwillis.github.io/docs/sports-data-files/footballlogs24.csv")
+logs1525 <- read_csv("~/code/dwillis.github.io/docs/sports-data-files/footballlogs1525.csv")
+logs25 <- read_csv("~/code/dwillis.github.io/docs/sports-data-files/footballlogs25.csv")
+```
+```{r}
+logs1525_minus <- logs1525 |> 
+  filter(Date < '2025-08-01')
+
+
+logs1525_plus <- bind_rows(logs1525_minus, logs25)
+
+logs1525_plus <- logs1525_plus |> 
+  mutate(Season = if_else(month(Date) >= 8, year(Date), year(Date) - 1))
+
+write_csv(logs1525_plus, "~/code/dwillis.github.io/docs/sports-data-files/footballlogs1525.csv")
+
+
+logs <- read_csv("https://thescoop.org/sports-data-files/footballlogs1525.csv")
+
+```
+
+
+
+
+```{r}
+logs25 |> 
+  filter(RushYds < 100, PassYds > 200) |> 
+  select(Team, Opponent, Result) |> 
+  group_by(Team) |> 
+  summarise(count = n()) |> 
+  arrange(desc(count))
+```
+
+
+```{r}
+logs25 |> 
+  filter(RushYds < 100, PassYds > 200) |> 
+  group_by(Result) |> 
+  summarise(count = n())
+
+
+logs24 |> 
+  filter(RushYds < 100, PassYds > 200) |> 
+  group_by(Result) |> 
+  summarise(count = n())
+```
+
