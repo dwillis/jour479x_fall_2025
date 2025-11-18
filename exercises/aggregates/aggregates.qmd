@@ -96,7 +96,7 @@ To get the number of records in our dataset, we run `nrow(nbaplayers)`
 nrow(nbaplayers)
 ```
 
-Another way to look at nrow -- we have 679 players from this season in our dataset.
+Another way to look at nrow -- we might have 735 players from this season in our dataset.
 
 What if we wanted to know how many players there were by position? To do that by hand, we'd have to take each of the 651 records and sort them into a pile. We'd put them in groups and then count them.
 
@@ -111,7 +111,7 @@ Here's the code. You should run it and then describe the output.
 ```{r}
 nbaplayers |>
   group_by(Pos) |>
-  summarise(
+  summarize(
     total = n()
   )
 ```
@@ -176,7 +176,7 @@ Why?
 Let's let sort help us.
 
 ```{r}
-nbaplayers |> arrange(desc(MP))
+nbaplayers |> arrange(MP)
 ```
 
 The player with the most minutes on the floor is a small forward. So that means there's Mikal Bridges rolling up 3,036 minutes in a season, and then there's Thunder sensation Alex Reese. Never heard of Alex Reese? Might be because he logged two minutes in one game this season.
@@ -207,3 +207,6 @@ So again, no surprise, shooting guards spend the most minutes on the floor in th
 Among the top five positions, which one seems the most interesting to you and why? What's a possible story here?
 
 **ANSWER** 
+
+
+My fabulous answer here.
