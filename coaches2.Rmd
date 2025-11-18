@@ -1,0 +1,701 @@
+---
+title: "NCAA Women's Basketball Coaching Histories: Education and Playing Career Analysis"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+library(tidyverse)
+library(jsonlite)
+library(stringr)
+```
+
+# Data Loading
+
+```{r load-data}
+# Load the coaching histories data
+coaching_data <- fromJSON("data/coaching_histories.json", flatten = FALSE)
+
+# Create a data frame with nested structures
+coaches_df <- coaching_data |>
+  as_tibble() |>
+  mutate(coach_id = row_number())
+
+# Unnest positions for college name analysis
+positions_df <- coaches_df |>
+  select(coach_id, name, team, positions) |>
+  unnest(positions, keep_empty = TRUE) |>
+  rename(
+    position_college = college,
+    position_title = title,
+    position_start = start_year,
+    position_end = end_year
+  )
+
+# Unnest education for analysis
+education_df <- coaches_df |>
+  select(coach_id, name, team, education) |>
+  unnest(education, keep_empty = TRUE) |>
+  rename(
+    education_college = college,
+    education_degree = degree,
+    education_year = year
+  )
+
+# Unnest playing career for analysis
+career_df <- coaches_df |>
+  select(coach_id, name, playing_career) |>
+  unnest(playing_career, keep_empty = TRUE) |>
+  rename(
+    career_team = team,
+    career_level = level,
+    career_start = start_year,
+    career_end = end_year
+  ) |>
+  filter(!is.na(career_team))
+
+cat("Total coaches:", nrow(coaches_df), "\n")
+cat("Total position records:", nrow(positions_df), "\n")
+cat("Total education records:", nrow(education_df), "\n")
+cat("Total career records:", nrow(career_df), "\n")
+```
+
+---
+
+# Part 1: College Name Standardization
+
+College names appear in multiple places: coaching positions, education records, and playing career records. We need to standardize these names to enable consistent analysis.
+
+## 1.1 Current State Analysis
+
+```{r college-analysis}
+# Analyze college names from positions
+position_colleges <- positions_df |>
+  count(position_college, sort = TRUE, name = "position_count") |>
+  filter(!is.na(position_college))
+
+# Analyze college names from education
+education_colleges <- education_df |>
+  count(education_college, sort = TRUE, name = "education_count") |>
+  filter(!is.na(education_college))
+
+cat("Unique colleges in positions:", nrow(position_colleges), "\n")
+cat("Unique colleges in education:", nrow(education_colleges), "\n")
+
+# Colleges appearing in both (most reliable NCAA institutions)
+colleges_in_both <- inner_join(
+  position_colleges,
+  education_colleges,
+  by = c("position_college" = "education_college")
+)
+
+cat("Colleges in both positions and education:", nrow(colleges_in_both), "\n")
+cat("\nTop 20 colleges (by position frequency):\n")
+print(position_colleges |> head(20), n = 20)
+```
+
+### Key Issues Identified
+
+**1. University System Variations**
+```{r university-variations}
+# Find variations for major universities
+find_variations <- function(pattern, colleges) {
+  colleges |>
+    filter(str_detect(position_college, regex(pattern, ignore_case = TRUE))) |>
+    arrange(position_college)
+}
+
+# Texas A&M variations
+cat("Texas A&M system variations:\n")
+find_variations("texas.*a.*m", position_colleges) |> print(n = 20)
+
+# Iowa variations
+cat("\nIowa system variations:\n")
+find_variations("^iowa|university of iowa", position_colleges) |> print(n = 20)
+
+# Connecticut variations
+cat("\nConnecticut/UConn variations:\n")
+find_variations("connecticut|uconn", position_colleges) |> print(n = 20)
+```
+
+**2. Abbreviation Issues**
+```{r abbreviation-issues}
+# Common abbreviations
+abbreviations <- c("LSU", "USC", "UCLA", "UCF", "UAB", "FIU", "FAU",
+                   "UTEP", "UNLV", "SMU", "TCU", "BYU")
+
+colleges_abbrev <- position_colleges |>
+  filter(position_college %in% abbreviations)
+
+cat("Common abbreviations found:\n")
+print(colleges_abbrev, n = 20)
+
+# Find if full names also exist
+cat("\nChecking for full name versions:\n")
+full_names <- c("Louisiana State", "Southern California", "California, Los Angeles")
+position_colleges |>
+  filter(str_detect(position_college, paste(full_names, collapse = "|")))
+```
+
+**3. Saint/St. Variations**
+```{r saint-variations}
+# Saint vs St. inconsistencies
+saint_schools <- position_colleges |>
+  filter(str_detect(position_college, regex("^saint |^st\\.|mount.*saint|mount.*st\\.",
+                                              ignore_case = TRUE)))
+
+cat("Schools with Saint/St. variations:\n")
+print(saint_schools, n = 30)
+```
+
+**4. Non-NCAA Entities**
+```{r non-ncaa}
+# Identify likely non-NCAA entities
+non_ncaa_patterns <- c("AAU", "High School", "Academy", "STORM", "Elite",
+                       "NBA", "WNBA", "Sun$", "Mercury$", "Bulls")
+
+non_ncaa_entities <- position_colleges |>
+  filter(str_detect(position_college, paste(non_ncaa_patterns, collapse = "|")))
+
+cat("Likely non-NCAA entities:", nrow(non_ncaa_entities), "\n")
+print(non_ncaa_entities |> head(20), n = 20)
+```
+
+## 1.2 Standardization Strategy
+
+### Building the Standardization Mapping
+
+```{r college-standardization-mapping}
+# Create standardization rules
+# This is a starter mapping - expand based on data analysis
+
+create_college_mapping <- function() {
+  tribble(
+    ~pattern, ~canonical_name, ~type,
+
+    # Major abbreviations
+    "^LSU$", "Louisiana State University", "NCAA_D1",
+    "^UCLA$", "University of California, Los Angeles", "NCAA_D1",
+    "^USC$", "University of Southern California", "NCAA_D1",
+    "^UConn$", "University of Connecticut", "NCAA_D1",
+    "^UCF$", "University of Central Florida", "NCAA_D1",
+    "^UAB$", "University of Alabama at Birmingham", "NCAA_D1",
+    "^SMU$", "Southern Methodist University", "NCAA_D1",
+    "^TCU$", "Texas Christian University", "NCAA_D1",
+    "^BYU$", "Brigham Young University", "NCAA_D1",
+
+    # Texas A&M system
+    "^Texas A&M$|^Texas A & M$", "Texas A&M University", "NCAA_D1",
+    "Texas A&M.*Commerce|A&M.*Commerce", "Texas A&M University-Commerce", "NCAA_D2",
+    "Texas A&M.*Corpus Christi", "Texas A&M University-Corpus Christi", "NCAA_D1",
+    "Texas A&M.*Kingsville", "Texas A&M University-Kingsville", "NCAA_D2",
+    "Texas A&M.*International", "Texas A&M University-International", "NCAA_D1",
+
+    # Iowa system
+    "^University of Iowa$", "University of Iowa", "NCAA_D1",
+    "^Iowa$", "University of Iowa", "NCAA_D1",
+    "^Iowa State|Iowa State University", "Iowa State University", "NCAA_D1",
+    "^Northern Iowa|University of Northern Iowa", "University of Northern Iowa", "NCAA_D1",
+
+    # Connecticut system
+    "^Connecticut$|^University of Connecticut$|^UConn$", "University of Connecticut", "NCAA_D1",
+    "Central Connecticut", "Central Connecticut State University", "NCAA_D1",
+    "Southern Connecticut", "Southern Connecticut State University", "NCAA_D2",
+
+    # Saint variations (examples)
+    "^Saint Joseph's|^St\\. Joseph's", "Saint Joseph's University", "NCAA_D1",
+    "^Saint Mary's \\(CA\\)|^St\\. Mary's \\(CA\\)", "Saint Mary's College of California", "NCAA_D1",
+    "^Saint Louis|^St\\. Louis", "Saint Louis University", "NCAA_D1",
+
+    # Alabama system
+    "^Alabama$|^University of Alabama$", "University of Alabama", "NCAA_D1",
+    "Alabama State", "Alabama State University", "NCAA_D1",
+    "Alabama A&M|Alabama A & M", "Alabama A&M University", "NCAA_D1",
+    "Alabama.*Birmingham|UAB", "University of Alabama at Birmingham", "NCAA_D1",
+    "Alabama.*Huntsville", "University of Alabama in Huntsville", "NCAA_D2",
+
+    # California system examples
+    "^Cal State.*Bakersfield|Cal State - Bakersfield", "California State University, Bakersfield", "NCAA_D1",
+    "^Cal State.*Fullerton", "California State University, Fullerton", "NCAA_D1",
+    "^Cal State.*Northridge|CSUN", "California State University, Northridge", "NCAA_D1",
+
+    # Non-NCAA patterns to flag
+    "AAU|STORM", "NON_NCAA_AAU", "AAU",
+    "High School$", "NON_NCAA_HIGH_SCHOOL", "HighSchool",
+    "^NBA$|^WNBA$|Sun$|Mercury$|Lynx$", "NON_NCAA_PROFESSIONAL", "Professional"
+  )
+}
+
+college_mapping <- create_college_mapping()
+print(college_mapping, n = 30)
+```
+
+### Standardization Function
+
+```{r standardize-college-function}
+standardize_college_name <- function(college, mapping = college_mapping) {
+  if (is.na(college)) return(NA_character_)
+
+  # Check against each pattern in mapping
+  for (i in 1:nrow(mapping)) {
+    if (str_detect(college, regex(mapping$pattern[i], ignore_case = TRUE))) {
+      return(mapping$canonical_name[i])
+    }
+  }
+
+  # If no match, do basic cleanup
+  college_clean <- college |>
+    # Normalize spacing around punctuation
+    str_replace_all(" +", " ") |>
+    # Trim whitespace
+    str_trim()
+
+  return(college_clean)
+}
+
+# Test the function
+test_colleges <- c(
+  "LSU",
+  "Texas A&M",
+  "Texas A & M",
+  "Texas A&M-Commerce",
+  "UConn",
+  "University of Connecticut",
+  "Saint Joseph's",
+  "St. Joseph's",
+  "Iowa",
+  "University of Iowa",
+  "Connecticut STORM AAU"
+)
+
+cat("College standardization examples:\n")
+tibble(
+  original = test_colleges,
+  standardized = sapply(test_colleges, standardize_college_name)
+) |> print(n = Inf)
+```
+
+### Apply College Standardization
+
+```{r apply-college-standardization}
+# Standardize position colleges
+positions_standardized <- positions_df |>
+  mutate(
+    position_college_standardized = sapply(position_college, standardize_college_name),
+    position_college_original = position_college
+  )
+
+# Standardize education colleges
+education_standardized <- education_df |>
+  mutate(
+    education_college_standardized = sapply(education_college, standardize_college_name),
+    education_college_original = education_college
+  )
+
+# Check results for positions
+cat("Position college standardization results:\n")
+cat("Before:", n_distinct(positions_standardized$position_college_original, na.rm = TRUE),
+    "unique colleges\n")
+cat("After:", n_distinct(positions_standardized$position_college_standardized, na.rm = TRUE),
+    "unique colleges\n")
+
+# Check results for education
+cat("\nEducation college standardization results:\n")
+cat("Before:", n_distinct(education_standardized$education_college_original, na.rm = TRUE),
+    "unique colleges\n")
+cat("After:", n_distinct(education_standardized$education_college_standardized, na.rm = TRUE),
+    "unique colleges\n")
+
+# Show some examples of standardization
+cat("\nExamples of college name standardization:\n")
+positions_standardized |>
+  filter(position_college_original != position_college_standardized) |>
+  count(position_college_original, position_college_standardized, sort = TRUE) |>
+  head(20)
+```
+
+---
+
+# Part 2: Education Analysis
+
+## 2.1 Educational Background Overview
+
+```{r education-overview}
+# Summary statistics
+cat("Education data summary:\n")
+cat("Total education records:", nrow(education_df), "\n")
+cat("Coaches with education data:", n_distinct(education_df$coach_id), "\n")
+cat("Coaches without education data:",
+    nrow(coaches_df) - n_distinct(education_df$coach_id), "\n")
+
+# Distribution of degrees
+degree_distribution <- education_standardized |>
+  count(education_degree, sort = TRUE) |>
+  filter(!is.na(education_degree))
+
+cat("\nDegree distribution:\n")
+print(degree_distribution, n = 20)
+
+# Number of degrees per coach
+degrees_per_coach <- education_standardized |>
+  group_by(coach_id, name) |>
+  summarize(num_degrees = n(), .groups = "drop") |>
+  count(num_degrees, name = "num_coaches")
+
+cat("\nNumber of degrees per coach:\n")
+print(degrees_per_coach)
+```
+
+## 2.2 Most Common Educational Institutions
+
+```{r education-institutions}
+# Top colleges for coaching education
+top_education_colleges <- education_standardized |>
+  count(education_college_standardized, sort = TRUE) |>
+  filter(!is.na(education_college_standardized))
+
+cat("Top 20 colleges where coaches received their education:\n")
+print(top_education_colleges |> head(20), n = 20)
+
+# Compare education colleges vs coaching colleges
+coaching_colleges <- positions_standardized |>
+  count(position_college_standardized, name = "coaching_count") |>
+  filter(!is.na(position_college_standardized))
+
+education_coaching_comparison <- top_education_colleges |>
+  left_join(coaching_colleges,
+            by = c("education_college_standardized" = "position_college_standardized")) |>
+  mutate(
+    coaching_count = replace_na(coaching_count, 0),
+    ratio = n / coaching_count
+  ) |>
+  arrange(desc(n))
+
+cat("\nTop 15 education institutions and their coaching presence:\n")
+print(education_coaching_comparison |> head(15), n = 15)
+```
+
+## 2.3 Degree Type Analysis
+
+```{r degree-analysis}
+# Classify degree types
+education_with_type <- education_standardized |>
+  mutate(
+    degree_type = case_when(
+      str_detect(education_degree, "Ph\\.?D|Doctorate") ~ "Doctorate",
+      str_detect(education_degree, "Master|M\\.|MBA|MED|MS|MA") ~ "Masters",
+      str_detect(education_degree, "Bachelor|B\\.|BA|BS") ~ "Bachelors",
+      str_detect(education_degree, "Associate|A\\.") ~ "Associates",
+      TRUE ~ "Other"
+    )
+  )
+
+# Count by degree type
+degree_type_counts <- education_with_type |>
+  count(degree_type, sort = TRUE)
+
+cat("Degree types:\n")
+print(degree_type_counts)
+
+# Percentage with advanced degrees
+coaches_with_masters_plus <- education_with_type |>
+  filter(degree_type %in% c("Masters", "Doctorate")) |>
+  pull(coach_id) |>
+  n_distinct()
+
+cat("\nCoaches with Masters or Doctorate:", coaches_with_masters_plus, "\n")
+cat("Percentage of all coaches:",
+    round(coaches_with_masters_plus / nrow(coaches_df) * 100, 1), "%\n")
+```
+
+## 2.4 Education Timing Analysis
+
+```{r education-timing}
+# When did coaches complete their education?
+education_years <- education_standardized |>
+  filter(!is.na(education_year))
+
+cat("Education year statistics:\n")
+cat("Records with year data:", nrow(education_years), "\n")
+cat("Year range:", min(education_years$education_year, na.rm = TRUE),
+    "to", max(education_years$education_year, na.rm = TRUE), "\n")
+
+# Distribution by decade
+education_by_decade <- education_years |>
+  mutate(decade = floor(education_year / 10) * 10) |>
+  count(decade, sort = TRUE)
+
+cat("\nEducation completion by decade:\n")
+print(education_by_decade)
+```
+
+---
+
+# Part 3: Playing Career Analysis
+
+## 3.1 Playing Career Overview
+
+```{r career-overview}
+# Summary statistics
+cat("Playing career data summary:\n")
+cat("Total playing career records:", nrow(career_df), "\n")
+cat("Coaches with playing career data:", n_distinct(career_df$coach_id), "\n")
+cat("Coaches without playing career data:",
+    nrow(coaches_df) - n_distinct(career_df$coach_id), "\n")
+
+# Distribution by level
+level_distribution <- career_df |>
+  count(career_level, sort = TRUE)
+
+cat("\nPlaying career level distribution:\n")
+print(level_distribution)
+
+# Number of teams played for
+teams_per_coach <- career_df |>
+  group_by(coach_id, name) |>
+  summarize(num_teams = n(), .groups = "drop") |>
+  count(num_teams, name = "num_coaches")
+
+cat("\nNumber of teams played for:\n")
+print(teams_per_coach)
+```
+
+## 3.2 Collegiate Playing Career
+
+```{r collegiate-career}
+# Focus on collegiate level
+college_players <- career_df |>
+  filter(career_level == "College")
+
+cat("Coaches who played in college:", n_distinct(college_players$coach_id), "\n")
+
+# Most common colleges where coaches played
+college_playing_teams <- college_players |>
+  count(career_team, sort = TRUE)
+
+cat("\nTop 20 colleges where coaches played:\n")
+print(college_playing_teams |> head(20), n = 20)
+
+# Did coaches play where they later coached?
+# This requires joining with position data
+coaches_play_and_coach <- college_players |>
+  inner_join(
+    positions_standardized |>
+      select(coach_id, position_college_standardized) |>
+      distinct(),
+    by = "coach_id"
+  ) |>
+  filter(str_detect(career_team, position_college_standardized) |
+         str_detect(position_college_standardized, career_team))
+
+cat("\nCoaches who played and later coached at same institution:\n")
+cat("Count:", n_distinct(coaches_play_and_coach$coach_id), "\n")
+
+# Show some examples
+coaches_play_and_coach |>
+  select(name, career_team, position_college_standardized) |>
+  distinct() |>
+  head(15)
+```
+
+## 3.3 Professional Playing Career
+
+```{r professional-career}
+# Focus on professional level
+pro_players <- career_df |>
+  filter(career_level == "Professional")
+
+cat("Coaches who played professionally:", n_distinct(pro_players$coach_id), "\n")
+
+# Professional teams
+pro_teams <- pro_players |>
+  count(career_team, sort = TRUE)
+
+cat("\nProfessional teams where coaches played:\n")
+print(pro_teams, n = 30)
+
+# WNBA teams specifically
+wnba_teams <- c("Lynx", "Mercury", "Sun", "Sparks", "Storm", "Mystics",
+                "Dream", "Sky", "Fever", "Liberty", "Wings", "Aces")
+
+wnba_players <- pro_players |>
+  filter(str_detect(career_team, paste(wnba_teams, collapse = "|")))
+
+cat("\nCoaches who played in WNBA:", n_distinct(wnba_players$coach_id), "\n")
+```
+
+## 3.4 Playing Career Duration
+
+```{r career-duration}
+# Calculate playing career length
+career_with_duration <- career_df |>
+  filter(!is.na(career_start) & !is.na(career_end)) |>
+  mutate(duration = career_end - career_start + 1)
+
+cat("Playing career duration statistics:\n")
+cat("Mean duration:", round(mean(career_with_duration$duration, na.rm = TRUE), 1), "years\n")
+cat("Median duration:", median(career_with_duration$duration, na.rm = TRUE), "years\n")
+cat("Range:", min(career_with_duration$duration, na.rm = TRUE),
+    "to", max(career_with_duration$duration, na.rm = TRUE), "years\n")
+
+# Distribution of career lengths
+career_length_dist <- career_with_duration |>
+  mutate(duration_category = case_when(
+    duration <= 2 ~ "1-2 years",
+    duration <= 4 ~ "3-4 years",
+    duration <= 6 ~ "5-6 years",
+    TRUE ~ "7+ years"
+  )) |>
+  count(duration_category)
+
+cat("\nCareer length distribution:\n")
+print(career_length_dist)
+```
+
+---
+
+# Part 4: Cross-Analysis
+
+## 4.1 Education and Playing Career Connection
+
+```{r education-career-connection}
+# Join education and career data
+education_and_career <- education_standardized |>
+  inner_join(career_df, by = "coach_id")
+
+cat("Coaches with both education and playing career data:",
+    n_distinct(education_and_career$coach_id), "\n")
+
+# Did coaches attend the same college where they played?
+same_college <- education_and_career |>
+  filter(career_level == "College") |>
+  filter(str_detect(career_team, education_college_standardized) |
+         str_detect(education_college_standardized, career_team))
+
+cat("\nCoaches who played and got degree from same college:",
+    n_distinct(same_college$coach_id), "\n")
+
+# Examples
+same_college |>
+  select(name, education_college_standardized, career_team, education_degree) |>
+  distinct() |>
+  head(15)
+```
+
+## 4.2 Professional Playing Career Impact on Coaching
+
+```{r pro-career-impact}
+# Compare coaches with and without pro playing experience
+coaches_with_pro <- career_df |>
+  filter(career_level == "Professional") |>
+  pull(coach_id) |>
+  unique()
+
+# Get current head coaches
+current_head_coaches <- positions_standardized |>
+  filter(is.na(position_end) | position_end >= 2020) |>
+  mutate(
+    position_title_clean = str_to_lower(position_title),
+    is_head_coach = str_detect(position_title_clean, "head coach")
+  ) |>
+  filter(is_head_coach)
+
+# Compare pro vs non-pro
+head_coaches_with_pro <- current_head_coaches |>
+  mutate(played_pro = coach_id %in% coaches_with_pro) |>
+  count(played_pro)
+
+cat("Current head coaches by professional playing experience:\n")
+print(head_coaches_with_pro)
+
+pct_pro <- head_coaches_with_pro |>
+  filter(played_pro == TRUE) |>
+  pull(n) / sum(head_coaches_with_pro$n) * 100
+
+cat("\nPercentage of current head coaches with pro experience:",
+    round(pct_pro, 1), "%\n")
+```
+
+---
+
+# Part 5: Implementation Recommendations
+
+## 5.1 Expand College Mapping
+
+The current mapping is a **starter template**. You should:
+
+```{r expand-mapping-recommendations}
+# Identify the most frequent colleges that need mapping
+colleges_to_map <- position_colleges |>
+  mutate(standardized = sapply(position_college, standardize_college_name)) |>
+  filter(position_college != standardized |
+         str_detect(position_college, " - | A&M |^St\\.|Saint")) |>
+  arrange(desc(position_count))
+
+cat("Top 50 colleges requiring standardization attention:\n")
+print(colleges_to_map |> head(50), n = 50)
+
+# Flag non-NCAA entities for review
+non_ncaa_review <- position_colleges |>
+  filter(str_detect(position_college,
+                    "AAU|High School|Academy|Elite|NBA|WNBA|Sun$|Mercury$|Sparks$|Storm$")) |>
+  arrange(desc(position_count))
+
+cat("\n\nNon-NCAA entities to flag/remove:\n")
+print(non_ncaa_review |> head(30), n = 30)
+```
+
+## 5.2 Create Reference Tables
+
+```{r create-reference-tables}
+# Create college name lookup
+college_lookup <- positions_standardized |>
+  count(position_college_original, position_college_standardized, sort = TRUE) |>
+  arrange(position_college_standardized, desc(n))
+
+cat("College name lookup table (first 30 rows):\n")
+print(college_lookup |> head(30), n = 30)
+
+# Save for manual review and expansion
+write_csv(college_lookup, "college_name_lookup.csv")
+
+cat("\n\nLookup table saved to: college_name_lookup.csv\n")
+```
+
+## 5.3 Validation Checks
+
+```{r validation-checks}
+# Check for potential issues
+cat("Validation checks:\n\n")
+
+# 1. Colleges with suspicious names
+suspicious_colleges <- positions_standardized |>
+  filter(str_detect(position_college_standardized,
+                    "NON_NCAA|AAU|High School|Professional")) |>
+  count(position_college_standardized, sort = TRUE)
+
+cat("1. Non-NCAA entities flagged:", nrow(suspicious_colleges), "\n")
+print(suspicious_colleges, n = 20)
+
+# 2. Missing data
+cat("\n2. Missing data:\n")
+cat("  Positions with no college:", sum(is.na(positions_standardized$position_college_original)), "\n")
+cat("  Education with no college:", sum(is.na(education_standardized$education_college_original)), "\n")
+cat("  Education with no degree:", sum(is.na(education_standardized$education_degree)), "\n")
+cat("  Education with no year:", sum(is.na(education_standardized$education_year)), "\n")
+cat("  Career with no team:", sum(is.na(career_df$career_team)), "\n")
+cat("  Career with no level:", sum(is.na(career_df$career_level)), "\n")
+```
+
+---
+
+## Summary
+
+In this notebook, we:
+
+1. **Standardized college names** across position and education data
+2. **Analyzed education backgrounds** including degrees, institutions, and timing
+3. **Examined playing careers** at collegiate and professional levels
+4. **Connected education and playing career data** to identify patterns
+5. **Assessed the impact** of professional playing experience on coaching careers
+
+The standardized data provides a foundation for deeper analysis of coaching career paths and success factors.

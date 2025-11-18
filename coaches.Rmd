@@ -1,5 +1,5 @@
 ---
-title: "NCAA Women's Basketball Coaching Histories: Standardization"
+title: "NCAA Women's Basketball Coaching Histories: Position Title Standardization"
 ---
 
 ```{r setup, include=FALSE}
@@ -31,37 +31,13 @@ positions_df <- coaches_df |>
     position_end = end_year
   )
 
-# Unnest education for analysis
-education_df <- coaches_df |>
-  select(coach_id, name, team, education) |>
-  unnest(education, keep_empty = TRUE) |>
-  rename(
-    education_college = college,
-    education_degree = degree,
-    education_year = year
-  )
-
-# Unnest playing career for analysis
-career_df <- coaches_df |>
-  select(coach_id, name, playing_career) |>
-  unnest(playing_career, keep_empty = TRUE) |>
-  rename(
-    career_team = team,
-    career_level = level,
-    career_start = start_year,
-    career_end = end_year
-  ) |> 
-  filter(!is.na(career_team))
-
 cat("Total coaches:", nrow(coaches_df), "\n")
 cat("Total position records:", nrow(positions_df), "\n")
-cat("Total education records:", nrow(education_df), "\n")
-cat("Total career records:", nrow(career_df), "\n")
 ```
 
 ---
 
-# Part 1: Position Title Standardization
+# Position Title Standardization
 
 ## 1.1 Current State Analysis
 
@@ -326,443 +302,167 @@ compound_roles |>
 
 ---
 
-# Part 2: College Name Standardization
+# Verification Exercises
 
-## 2.1 Current State Analysis
+Now let's verify that our standardization is working correctly. Complete the following exercises to confirm the changes.
 
-```{r college-analysis}
-# Analyze college names from positions
-position_colleges <- positions_df |>
-  count(position_college, sort = TRUE, name = "position_count") |>
-  filter(!is.na(position_college))
+## Exercise 1: Verify Case Normalization
 
-# Analyze college names from education
-education_colleges <- education_df |>
-  count(education_college, sort = TRUE, name = "education_count") |>
-  filter(!is.na(education_college))
+**Task:** Confirm that position titles with different cases are now standardized to the same value.
 
-cat("Unique colleges in positions:", nrow(position_colleges), "\n")
-cat("Unique colleges in education:", nrow(education_colleges), "\n")
+```{r verify-case}
+# Example: Find positions that had different cases but are now the same
+case_examples <- positions_standardized |>
+  filter(position_title_original %in% c("Head Coach", "head coach", "HEAD COACH")) |>
+  select(position_title_original, position_title_standardized) |>
+  distinct()
 
-# Colleges appearing in both (most reliable NCAA institutions)
-colleges_in_both <- inner_join(
-  position_colleges,
-  education_colleges,
-  by = c("position_college" = "education_college")
-)
+cat("Verification: Case normalization\n")
+print(case_examples)
 
-cat("Colleges in both positions and education:", nrow(colleges_in_both), "\n")
-cat("\nTop 20 colleges (by position frequency):\n")
-print(position_colleges |> head(20), n = 20)
+# Question for students: How many unique standardized titles exist for these variations?
+# Answer: Should be 1 ("Head Coach")
 ```
 
-### Key Issues Identified
+## Exercise 2: Count Position Types
 
-**1. University System Variations**
-```{r university-variations}
-# Find variations for major universities
-find_variations <- function(pattern, colleges) {
-  colleges |>
-    filter(str_detect(position_college, regex(pattern, ignore_case = TRUE))) |>
-    arrange(position_college)
-}
+**Task:** Find the three most common standardized position titles and their counts.
 
-# Texas A&M variations
-cat("Texas A&M system variations:\n")
-find_variations("texas.*a.*m", position_colleges) |> print(n = 20)
+```{r verify-top-positions}
+# Students should write code here to find top 3 positions
+# Solution:
+top_3_positions <- positions_standardized |>
+  count(position_title_standardized, sort = TRUE) |>
+  head(3)
 
-# Iowa variations
-cat("\nIowa system variations:\n")
-find_variations("^iowa|university of iowa", position_colleges) |> print(n = 20)
+cat("Top 3 standardized positions:\n")
+print(top_3_positions)
 
-# Connecticut variations
-cat("\nConnecticut/UConn variations:\n")
-find_variations("connecticut|uconn", position_colleges) |> print(n = 20)
+# Question: What are the top 3 positions and approximately what percentage
+# of total positions does each represent?
 ```
 
-**2. Abbreviation Issues**
-```{r abbreviation-issues}
-# Common abbreviations
-abbreviations <- c("LSU", "USC", "UCLA", "UCF", "UAB", "FIU", "FAU",
-                   "UTEP", "UNLV", "SMU", "TCU", "BYU")
+## Exercise 3: Verify Separator Standardization
 
-colleges_abbrev <- position_colleges |>
-  filter(position_college %in% abbreviations)
+**Task:** Look at positions that originally had different separators (/, &, and, comma) and verify they are correctly standardized.
 
-cat("Common abbreviations found:\n")
-print(colleges_abbrev, n = 20)
+```{r verify-separators}
+# Find examples of titles with different separators
+separator_examples <- positions_standardized |>
+  filter(str_detect(position_title_original, "Assistant.*Recruiting")) |>
+  select(position_title_original, position_title_standardized) |>
+  distinct() |>
+  arrange(position_title_original)
 
-# Find if full names also exist
-cat("\nChecking for full name versions:\n")
-full_names <- c("Louisiana State", "Southern California", "California, Los Angeles")
-position_colleges |>
-  filter(str_detect(position_college, paste(full_names, collapse = "|")))
+cat("Verification: Separator handling\n")
+print(separator_examples, n = 20)
+
+# Question: Are titles like "Assistant Coach/Recruiting Coordinator" and
+# "Assistant Coach & Recruiting Coordinator" now standardized the same way?
 ```
 
-**3. Saint/St. Variations**
-```{r saint-variations}
-# Saint vs St. inconsistencies
-saint_schools <- position_colleges |>
-  filter(str_detect(position_college, regex("^saint |^st\\.|mount.*saint|mount.*st\\.",
-                                              ignore_case = TRUE)))
+## Exercise 4: Check Reduction in Unique Titles
 
-cat("Schools with Saint/St. variations:\n")
-print(saint_schools, n = 30)
+**Task:** Calculate the percentage reduction in unique position titles after standardization.
+
+```{r verify-reduction}
+# Students should calculate the reduction
+original_unique <- n_distinct(positions_standardized$position_title_original, na.rm = TRUE)
+standardized_unique <- n_distinct(positions_standardized$position_title_standardized, na.rm = TRUE)
+reduction_pct <- round((1 - standardized_unique / original_unique) * 100, 1)
+
+cat("Original unique titles:", original_unique, "\n")
+cat("Standardized unique titles:", standardized_unique, "\n")
+cat("Reduction:", reduction_pct, "%\n")
+
+# Question: Why is this reduction important for data analysis?
+# Answer: It allows us to group similar positions together and get more
+# meaningful counts and analyses.
 ```
 
-**4. Non-NCAA Entities**
-```{r non-ncaa}
-# Identify likely non-NCAA entities
-non_ncaa_patterns <- c("AAU", "High School", "Academy", "STORM", "Elite",
-                       "NBA", "WNBA", "Sun$", "Mercury$", "Bulls")
+## Exercise 5: Identify Compound Roles
 
-non_ncaa_entities <- position_colleges |>
-  filter(str_detect(position_college, paste(non_ncaa_patterns, collapse = "|")))
+**Task:** Find all positions that contain multiple roles (compound positions) and count how many exist.
 
-cat("Likely non-NCAA entities:", nrow(non_ncaa_entities), "\n")
-print(non_ncaa_entities |> head(20), n = 20)
+```{r verify-compound}
+# Students should identify compound roles
+compound_count <- positions_with_roles |>
+  filter(map_int(role_components, length) > 1) |>
+  nrow()
+
+cat("Number of positions with multiple roles:", compound_count, "\n")
+
+# Show a few examples
+cat("\nExamples of compound roles:\n")
+positions_with_roles |>
+  filter(map_int(role_components, length) > 1) |>
+  select(position_title_original, role_components) |>
+  head(5)
+
+# Question: What's an example of a compound role and what are its components?
 ```
 
-## 2.2 Standardization Strategy
+## Exercise 6: Verify "Other" Category
 
-### Building the Standardization Mapping
+**Task:** Examine positions that were mapped to "Other" to understand what didn't fit our standardization rules.
 
-```{r college-standardization-mapping}
-# Create standardization rules
-# This is a starter mapping - expand based on data analysis
-
-create_college_mapping <- function() {
-  tribble(
-    ~pattern, ~canonical_name, ~type,
-
-    # Major abbreviations
-    "^LSU$", "Louisiana State University", "NCAA_D1",
-    "^UCLA$", "University of California, Los Angeles", "NCAA_D1",
-    "^USC$", "University of Southern California", "NCAA_D1",
-    "^UConn$", "University of Connecticut", "NCAA_D1",
-    "^UCF$", "University of Central Florida", "NCAA_D1",
-    "^UAB$", "University of Alabama at Birmingham", "NCAA_D1",
-    "^SMU$", "Southern Methodist University", "NCAA_D1",
-    "^TCU$", "Texas Christian University", "NCAA_D1",
-    "^BYU$", "Brigham Young University", "NCAA_D1",
-
-    # Texas A&M system
-    "^Texas A&M$|^Texas A & M$", "Texas A&M University", "NCAA_D1",
-    "Texas A&M.*Commerce|A&M.*Commerce", "Texas A&M University-Commerce", "NCAA_D2",
-    "Texas A&M.*Corpus Christi", "Texas A&M University-Corpus Christi", "NCAA_D1",
-    "Texas A&M.*Kingsville", "Texas A&M University-Kingsville", "NCAA_D2",
-    "Texas A&M.*International", "Texas A&M University-International", "NCAA_D1",
-
-    # Iowa system
-    "^University of Iowa$", "University of Iowa", "NCAA_D1",
-    "^Iowa$", "University of Iowa", "NCAA_D1",
-    "^Iowa State|Iowa State University", "Iowa State University", "NCAA_D1",
-    "^Northern Iowa|University of Northern Iowa", "University of Northern Iowa", "NCAA_D1",
-
-    # Connecticut system
-    "^Connecticut$|^University of Connecticut$|^UConn$", "University of Connecticut", "NCAA_D1",
-    "Central Connecticut", "Central Connecticut State University", "NCAA_D1",
-    "Southern Connecticut", "Southern Connecticut State University", "NCAA_D2",
-
-    # Saint variations (examples)
-    "^Saint Joseph's|^St\\. Joseph's", "Saint Joseph's University", "NCAA_D1",
-    "^Saint Mary's \\(CA\\)|^St\\. Mary's \\(CA\\)", "Saint Mary's College of California", "NCAA_D1",
-    "^Saint Louis|^St\\. Louis", "Saint Louis University", "NCAA_D1",
-
-    # Alabama system
-    "^Alabama$|^University of Alabama$", "University of Alabama", "NCAA_D1",
-    "Alabama State", "Alabama State University", "NCAA_D1",
-    "Alabama A&M|Alabama A & M", "Alabama A&M University", "NCAA_D1",
-    "Alabama.*Birmingham|UAB", "University of Alabama at Birmingham", "NCAA_D1",
-    "Alabama.*Huntsville", "University of Alabama in Huntsville", "NCAA_D2",
-
-    # California system examples
-    "^Cal State.*Bakersfield|Cal State - Bakersfield", "California State University, Bakersfield", "NCAA_D1",
-    "^Cal State.*Fullerton", "California State University, Fullerton", "NCAA_D1",
-    "^Cal State.*Northridge|CSUN", "California State University, Northridge", "NCAA_D1",
-
-    # Non-NCAA patterns to flag
-    "AAU|STORM", "NON_NCAA_AAU", "AAU",
-    "High School$", "NON_NCAA_HIGH_SCHOOL", "HighSchool",
-    "^NBA$|^WNBA$|Sun$|Mercury$|Lynx$", "NON_NCAA_PROFESSIONAL", "Professional"
-  )
-}
-
-college_mapping <- create_college_mapping()
-print(college_mapping, n = 30)
-```
-
-### Standardization Function
-
-```{r standardize-college-function}
-standardize_college_name <- function(college, mapping = college_mapping) {
-  if (is.na(college)) return(NA_character_)
-
-  # Check against each pattern in mapping
-  for (i in 1:nrow(mapping)) {
-    if (str_detect(college, regex(mapping$pattern[i], ignore_case = TRUE))) {
-      return(mapping$canonical_name[i])
-    }
-  }
-
-  # If no match, do basic cleanup
-  college_clean <- college |>
-    # Normalize spacing around punctuation
-    str_replace_all(" +", " ") |>
-    # Trim whitespace
-    str_trim()
-
-  return(college_clean)
-}
-
-# Test the function
-test_colleges <- c(
-  "LSU",
-  "Texas A&M",
-  "Texas A & M",
-  "Texas A&M-Commerce",
-  "UConn",
-  "University of Connecticut",
-  "Saint Joseph's",
-  "St. Joseph's",
-  "Iowa",
-  "University of Iowa",
-  "Connecticut STORM AAU"
-)
-
-cat("College standardization examples:\n")
-tibble(
-  original = test_colleges,
-  standardized = sapply(test_colleges, standardize_college_name)
-) |> print(n = Inf)
-```
-
-### Apply College Standardization
-
-```{r apply-college-standardization}
-# Standardize position colleges
-positions_final <- positions_standardized |>
-  mutate(
-    position_college_standardized = sapply(position_college, standardize_college_name),
-    position_college_original = position_college
-  )
-
-# Standardize education colleges
-education_final <- education_df |>
-  mutate(
-    education_college_standardized = sapply(education_college, standardize_college_name),
-    education_college_original = education_college
-  )
-
-# Check results for positions
-cat("Position college standardization results:\n")
-cat("Before:", n_distinct(positions_final$position_college_original, na.rm = TRUE),
-    "unique colleges\n")
-cat("After:", n_distinct(positions_final$position_college_standardized, na.rm = TRUE),
-    "unique colleges\n")
-
-# Show some examples of standardization
-positions_final |>
-  filter(position_college_original != position_college_standardized) |>
-  count(position_college_original, position_college_standardized, sort = TRUE) |>
-  head(20)
-```
-
----
-
-# Part 3: Implementation Recommendations
-
-## 3.1 Immediate Actions (Week 1-2)
-
-### Priority 1: Expand College Mapping
-
-The current mapping is a **starter template**. You should:
-
-```{r expand-mapping-recommendations}
-# Identify the most frequent colleges that need mapping
-colleges_to_map <- position_colleges |>
-  mutate(standardized = sapply(position_college, standardize_college_name)) |>
-  filter(position_college != standardized |
-         str_detect(position_college, " - | A&M |^St\\.|Saint")) |>
-  arrange(desc(position_count))
-
-cat("Top 50 colleges requiring standardization attention:\n")
-print(colleges_to_map |> head(50), n = 50)
-
-# Flag non-NCAA entities for review
-non_ncaa_review <- position_colleges |>
-  filter(str_detect(position_college,
-                    "AAU|High School|Academy|Elite|NBA|WNBA|Sun$|Mercury$|Sparks$|Storm$")) |>
-  arrange(desc(position_count))
-
-cat("\n\nNon-NCAA entities to flag/remove:\n")
-print(non_ncaa_review |> head(30), n = 30)
-```
-
-### Priority 2: Create Reference Tables
-
-```{r create-reference-tables}
-# Create a comprehensive position title lookup
-position_lookup <- positions_final |>
-  count(position_title_original, position_title_standardized, sort = TRUE) |>
-  arrange(position_title_standardized, desc(n))
-
-cat("Position title lookup table (first 30 rows):\n")
-print(position_lookup |> head(30), n = 30)
-
-# Create college name lookup
-college_lookup_positions <- positions_final |>
-  count(position_college_original, position_college_standardized, sort = TRUE) |>
-  arrange(position_college_standardized, desc(n))
-
-cat("\n\nCollege name lookup table (first 30 rows):\n")
-print(college_lookup_positions |> head(30), n = 30)
-
-# Save these for manual review and expansion
-write_csv(position_lookup, "position_title_lookup.csv")
-write_csv(college_lookup_positions, "college_name_lookup.csv")
-
-cat("\n\nLookup tables saved to:\n")
-cat("  - position_title_lookup.csv\n")
-cat("  - college_name_lookup.csv\n")
-```
-
-## 3.2 Medium-Term Actions (Month 1-2)
-
-### Manual Review Process
-
-1. **Review lookup tables** (`position_title_lookup.csv`, `college_name_lookup.csv`)
-2. **Expand college mapping** with official NCAA names
-3. **Handle edge cases**:
-   - Defunct/merged institutions
-   - International institutions
-   - Multi-campus systems
-4. **Add institution type flags**:
-   - NCAA Division (D1, D2, D3)
-   - NAIA
-   - Junior College
-   - High School
-   - Non-NCAA
-
-### Validation Checks
-
-```{r validation-checks}
-# Check for potential issues
-cat("Validation checks:\n\n")
-
-# 1. Positions with no standardized title
-no_standard_position <- positions_final |>
-  filter(is.na(position_title_standardized) | position_title_standardized == "Other") |>
+```{r verify-other}
+# Find positions mapped to "Other"
+other_positions <- positions_standardized |>
+  filter(position_title_standardized == "Other") |>
   count(position_title_original, sort = TRUE)
 
-cat("1. Positions mapped to 'Other':", nrow(no_standard_position), "\n")
-if (nrow(no_standard_position) > 0) {
-  print(no_standard_position |> head(10), n = 10)
+cat("Positions mapped to 'Other':", sum(other_positions$n), "\n")
+cat("Unique position types in 'Other':", nrow(other_positions), "\n")
+
+if (nrow(other_positions) > 0) {
+  cat("\nTop 10 positions in 'Other' category:\n")
+  print(other_positions |> head(10), n = 10)
 }
 
-# 2. Colleges with suspicious names
-suspicious_colleges <- positions_final |>
-  filter(str_detect(position_college_standardized,
-                    "NON_NCAA|AAU|High School|Professional")) |>
-  count(position_college_standardized, sort = TRUE)
-
-cat("\n2. Non-NCAA entities flagged:", nrow(suspicious_colleges), "\n")
-print(suspicious_colleges, n = 20)
-
-# 3. Missing data
-cat("\n3. Missing data:\n")
-cat("  Positions with no college:", sum(is.na(positions_final$position_college_original)), "\n")
-cat("  Positions with no title:", sum(is.na(positions_final$position_title_original)), "\n")
-cat("  Education with no college:", sum(is.na(education_final$education_college_original)), "\n")
+# Question: What types of positions ended up in "Other"?
+# Should any of these be added to our standardization function?
 ```
 
-## 3.3 Long-Term Actions (Month 3+)
+## Exercise 7: Analyze Coach Career Progression
 
-### Enhanced Data Model
+**Task:** For a specific coach, trace their career progression through different position titles.
 
-Consider restructuring the data model to support:
+```{r verify-progression}
+# Find a coach with multiple positions
+coach_with_progression <- positions_standardized |>
+  group_by(name) |>
+  filter(n() >= 3) |>
+  ungroup() |>
+  slice(1) |>
+  pull(name)
 
-```{r enhanced-model-example}
-# Example: Separate table for multi-role positions
-position_roles_long <- positions_final |>
-  select(coach_id, name, position_college_standardized,
-         position_title_original, position_start, position_end) |>
-  mutate(role_components = map(position_title_original, extract_role_components)) |>
-  unnest(role_components) |>
-  mutate(role_standardized = sapply(role_components, standardize_position_title))
+# Show their career progression
+career_path <- positions_standardized |>
+  filter(name == coach_with_progression) |>
+  arrange(position_start) |>
+  select(name, position_college, position_title_standardized,
+         position_start, position_end)
 
-cat("Example of multi-role expansion:\n")
-position_roles_long |>
-  filter(!is.na(role_components)) |>
-  select(name, position_title_original, role_components, role_standardized) |>
-  head(20)
+cat("Career progression for:", coach_with_progression, "\n")
+print(career_path, n = Inf)
 
-# Example: Add institution metadata
-institution_metadata <- tribble(
-  ~canonical_name, ~division, ~conference, ~state, ~control,
-  "University of Connecticut", "D1", "Big East", "Connecticut", "Public",
-  "Louisiana State University", "D1", "SEC", "Louisiana", "Public",
-  "University of Iowa", "D1", "Big Ten", "Iowa", "Public",
-  "Saint Joseph's University", "D1", "Atlantic 10", "Pennsylvania", "Private"
-)
-
-print(institution_metadata)
+# Question: How does standardization help us understand career progression?
+# Answer: It makes it easier to see movement between role types (e.g.,
+# Assistant Coach -> Associate Head Coach -> Head Coach)
 ```
 
 ---
 
-# Part 4: Export Standardized Data
+## Summary
 
-```{r export-data}
-# Reconstruct the standardized coaching data
-coaches_standardized <- coaches_df |>
-  select(-positions, -education) |>
-  left_join(
-    positions_final |>
-      group_by(coach_id) |>
-      summarize(positions_standardized = list(
-        tibble(
-          college = position_college_standardized,
-          college_original = position_college_original,
-          title = position_title_standardized,
-          title_original = position_title_original,
-          start_year = position_start,
-          end_year = position_end
-        )
-      )),
-    by = "coach_id"
-  ) |>
-  left_join(
-    education_final |>
-      group_by(coach_id) |>
-      summarize(education_standardized = list(
-        tibble(
-          college = education_college_standardized,
-          college_original = education_college_original,
-          degree = education_degree,
-          year = education_year
-        )
-      )),
-    by = "coach_id"
-  )
+In this notebook, we:
 
-# Export to JSON with standardized fields
-output_json <- coaches_standardized |>
-  select(-coach_id) |>
-  toJSON(pretty = TRUE, auto_unbox = TRUE)
+1. **Analyzed** position title fragmentation (1,744 unique titles for ~5,000 positions)
+2. **Identified** key issues: case sensitivity, separator inconsistencies, sport designation variations
+3. **Created** a standardization function that reduces titles to ~20 canonical categories
+4. **Applied** standardization while preserving original titles
+5. **Extracted** multiple roles from compound position titles
+6. **Verified** the standardization through multiple exercises
 
-# Write to file
-write(output_json, "coaching_histories_standardized.json")
-
-cat("Standardized data exported to: ncaa/coaching_histories_standardized.json\n")
-cat("\nFile contains:\n")
-cat("  - Original position titles and college names\n")
-cat("  - Standardized position titles and college names\n")
-cat("  - All original data preserved\n")
-```
-
-## Files Generated
-
-- `position_title_lookup.csv` - Position title standardization mapping (review/edit this)
-- `college_name_lookup.csv` - College name standardization mapping (review/edit this)
-- `coaching_histories_standardized.json` - Standardized dataset with originals preserved
+The standardized data is now ready for further analysis in subsequent notebooks.
