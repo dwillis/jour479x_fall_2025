@@ -174,14 +174,14 @@ standardize_position_title <- function(title) {
 
   # Primary role matching (order matters - most specific first)
   case_when(
+    # Associate variations (must come BEFORE general head coach check)
+    str_detect(title_clean, "associate.*head") ~ "Associate Head Coach",
+    str_detect(title_clean, "associate.*coach") ~ "Associate Head Coach",
+
     # Head Coach variations
     str_detect(title_clean, "interim.*head.*coach") ~ "Interim Head Coach",
     str_detect(title_clean, "head.*coach") ~ "Head Coach",
     str_detect(title_clean, "acting.*head.*coach") ~ "Interim Head Coach",
-
-    # Associate variations
-    str_detect(title_clean, "associate.*head") ~ "Associate Head Coach",
-    str_detect(title_clean, "associate.*coach") ~ "Associate Head Coach",
 
     # Catch all other coach references (before specific non-coaching roles)
     # If title contains "coach" and not head/associate head, standardize as Assistant Coach
