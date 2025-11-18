@@ -208,12 +208,11 @@ standardize_position_title <- function(title) {
     str_detect(title_clean, "associate.*head") ~ "Associate Head Coach",
     str_detect(title_clean, "associate.*coach") ~ "Associate Head Coach",
 
-    # Assistant variations (after more specific roles)
-    str_detect(title_clean, "lead.*assistant") ~ "Lead Assistant Coach",
-    str_detect(title_clean, "head.*assistant") ~ "Lead Assistant Coach",
-    str_detect(title_clean, "assistant.*head") ~ "Assistant Head Coach",
+    # Catch all other coach references (before specific non-coaching roles)
+    # If title contains "coach" and not head/associate head, standardize as Assistant Coach
+    str_detect(title_clean, "coach") ~ "Assistant Coach",
 
-    # Coordinator roles (before general assistant)
+    # Coordinator roles (only reached if no "coach" in title)
     str_detect(title_clean, "recruiting.*coordinator") ~ "Recruiting Coordinator",
     str_detect(title_clean, "offensive.*coordinator") ~ "Offensive Coordinator",
     str_detect(title_clean, "defensive.*coordinator") ~ "Defensive Coordinator",
@@ -224,9 +223,6 @@ standardize_position_title <- function(title) {
     str_detect(title_clean, "director.*player.*development") ~ "Director of Player Development",
     str_detect(title_clean, "director.*recruiting") ~ "Director of Recruiting",
     str_detect(title_clean, "player.*development") ~ "Director of Player Development",
-
-    # General assistant (after specific roles)
-    str_detect(title_clean, "assistant.*coach") ~ "Assistant Coach",
 
     # Graduate and volunteer roles
     str_detect(title_clean, "graduate.*assistant") ~ "Graduate Assistant",
@@ -242,9 +238,6 @@ standardize_position_title <- function(title) {
     str_detect(title_clean, "team.*manager") ~ "Manager",
     str_detect(title_clean, "^manager$") ~ "Manager",
     str_detect(title_clean, "administrative.*assistant") ~ "Administrative Assistant",
-
-    # Catch remaining coach references
-    str_detect(title_clean, "coach") ~ "Assistant Coach",
 
     # Default
     TRUE ~ "Other"
