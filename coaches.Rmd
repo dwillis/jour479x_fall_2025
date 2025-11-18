@@ -320,8 +320,6 @@ case_examples <- positions_standardized |>
 cat("Verification: Case normalization\n")
 print(case_examples)
 
-# Question for students: How many unique standardized titles exist for these variations?
-# Answer: Should be 1 ("Head Coach")
 ```
 
 ## Exercise 2: Count Position Types
@@ -329,17 +327,9 @@ print(case_examples)
 **Task:** Find the three most common standardized position titles and their counts.
 
 ```{r verify-top-positions}
-# Students should write code here to find top 3 positions
-# Solution:
-top_3_positions <- positions_standardized |>
-  count(position_title_standardized, sort = TRUE) |>
-  head(3)
 
-cat("Top 3 standardized positions:\n")
-print(top_3_positions)
 
-# Question: What are the top 3 positions and approximately what percentage
-# of total positions does each represent?
+
 ```
 
 ## Exercise 3: Verify Separator Standardization
@@ -357,7 +347,7 @@ separator_examples <- positions_standardized |>
 cat("Verification: Separator handling\n")
 print(separator_examples, n = 20)
 
-# Question: Are titles like "Assistant Coach/Recruiting Coordinator" and
+# Are titles like "Assistant Coach/Recruiting Coordinator" and
 # "Assistant Coach & Recruiting Coordinator" now standardized the same way?
 ```
 
@@ -375,9 +365,6 @@ cat("Original unique titles:", original_unique, "\n")
 cat("Standardized unique titles:", standardized_unique, "\n")
 cat("Reduction:", reduction_pct, "%\n")
 
-# Question: Why is this reduction important for data analysis?
-# Answer: It allows us to group similar positions together and get more
-# meaningful counts and analyses.
 ```
 
 ## Exercise 5: Identify Compound Roles
@@ -385,7 +372,7 @@ cat("Reduction:", reduction_pct, "%\n")
 **Task:** Find all positions that contain multiple roles (compound positions) and count how many exist.
 
 ```{r verify-compound}
-# Students should identify compound roles
+# Identify compound roles
 compound_count <- positions_with_roles |>
   filter(map_int(role_components, length) > 1) |>
   nrow()
@@ -399,7 +386,7 @@ positions_with_roles |>
   select(position_title_original, role_components) |>
   head(5)
 
-# Question: What's an example of a compound role and what are its components?
+# Question: Are there any common patterns in compound roles?
 ```
 
 ## Exercise 6: Verify "Other" Category
@@ -421,7 +408,7 @@ if (nrow(other_positions) > 0) {
 }
 
 # Question: What types of positions ended up in "Other"?
-# Should any of these be added to our standardization function?
+# Should any of these be added to our standardization function? Are any of them worth exploring?
 ```
 
 ## Exercise 7: Analyze Coach Career Progression
@@ -441,15 +428,11 @@ coach_with_progression <- positions_standardized |>
 career_path <- positions_standardized |>
   filter(name == coach_with_progression) |>
   arrange(position_start) |>
-  select(name, position_college, position_title_standardized,
+  select(name, position_college, position_title, position_title_standardized,
          position_start, position_end)
 
 cat("Career progression for:", coach_with_progression, "\n")
 print(career_path, n = Inf)
-
-# Question: How does standardization help us understand career progression?
-# Answer: It makes it easier to see movement between role types (e.g.,
-# Assistant Coach -> Associate Head Coach -> Head Coach)
 ```
 
 ---
