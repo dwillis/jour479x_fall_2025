@@ -1,0 +1,448 @@
+---
+title: "NCAA Women's Basketball Coaching Career Pathways Analysis"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+library(tidyverse)
+library(jsonlite)
+```
+
+# Career Pathways Analysis
+
+This notebook explores common career pathways for NCAA women's basketball coaches, focusing on how coaches progress through different positions on their way to becoming head coaches.
+
+## Data Loading and Preparation
+
+First, we'll load the coaching data and apply the position title standardization from the previous notebook.
+
+```{r load-and-prepare}
+# Load the coaching histories data
+coaching_data <- fromJSON("data/coaching_histories.json", flatten = FALSE)
+
+# Create a data frame with nested structures
+coaches_df <- coaching_data |>
+  as_tibble() |>
+  mutate(coach_id = row_number())
+
+# Unnest positions for analysis
+positions_df <- coaches_df |>
+  select(coach_id, name, team, positions) |>
+  unnest(positions, keep_empty = TRUE) |>
+  rename(
+    position_college = college,
+    position_title = title,
+    position_start = start_year,
+    position_end = end_year
+  )
+
+# Apply the standardization function from coaches.Rmd
+standardize_position_title <- function(title) {
+  if (is.na(title)) return(NA_character_)
+
+  title_lower <- str_to_lower(title)
+  title_lower <- str_replace_all(title_lower, "the .+ (head|assistant|associate)", "\\1")
+  title_clean <- str_replace_all(title_lower, " */ *", " / ")
+  title_clean <- str_replace_all(title_clean, " *& *| and ", " / ")
+  title_clean <- str_replace_all(title_clean, " *, *", " / ")
+
+  case_when(
+    str_detect(title_clean, "interim.*head.*coach") ~ "Interim Head Coach",
+    str_detect(title_clean, "head.*coach") ~ "Head Coach",
+    str_detect(title_clean, "acting.*head.*coach") ~ "Interim Head Coach",
+    str_detect(title_clean, "associate.*head") ~ "Associate Head Coach",
+    str_detect(title_clean, "associate.*coach") ~ "Associate Head Coach",
+    str_detect(title_clean, "coach") ~ "Assistant Coach",
+    str_detect(title_clean, "recruiting.*coordinator") ~ "Recruiting Coordinator",
+    str_detect(title_clean, "offensive.*coordinator") ~ "Offensive Coordinator",
+    str_detect(title_clean, "defensive.*coordinator") ~ "Defensive Coordinator",
+    str_detect(title_clean, "director.*basketball.*operations") ~ "Director of Basketball Operations",
+    str_detect(title_clean, "director.*operations") ~ "Director of Basketball Operations",
+    str_detect(title_clean, "director.*player.*development") ~ "Director of Player Development",
+    str_detect(title_clean, "director.*recruiting") ~ "Director of Recruiting",
+    str_detect(title_clean, "player.*development") ~ "Director of Player Development",
+    str_detect(title_clean, "graduate.*assistant") ~ "Graduate Assistant",
+    str_detect(title_clean, "graduate.*manager") ~ "Graduate Assistant",
+    str_detect(title_clean, "volunteer.*assistant") ~ "Volunteer Assistant",
+    str_detect(title_clean, "video.*coordinator") ~ "Video Coordinator",
+    str_detect(title_clean, "strength.*conditioning") ~ "Strength and Conditioning Coach",
+    str_detect(title_clean, "athletic.*trainer") ~ "Athletic Trainer",
+    str_detect(title_clean, "student.*manager") ~ "Student Manager",
+    str_detect(title_clean, "student.*assistant") ~ "Student Assistant",
+    str_detect(title_clean, "team.*manager") ~ "Manager",
+    str_detect(title_clean, "^manager$") ~ "Manager",
+    str_detect(title_clean, "administrative.*assistant") ~ "Administrative Assistant",
+    TRUE ~ "Other"
+  )
+}
+
+# Apply standardization
+positions_standardized <- positions_df |>
+  mutate(
+    position_title_standardized = sapply(position_title, standardize_position_title),
+    position_title_original = position_title
+  )
+
+cat("Total coaches:", nrow(coaches_df), "\n")
+cat("Total position records:", nrow(positions_standardized), "\n")
+```
+
+---
+
+## Identifying Career Coaching Positions
+
+For career pathway analysis, we'll focus on positions that are part of the traditional coaching track. Let's define which positions are considered "coaching positions" versus support or administrative roles.
+
+```{r define-coaching-positions}
+# Define what we consider "coaching" positions for career pathway analysis
+# EXERCISE: Students should complete this list with the appropriate position types
+coaching_positions <- c(
+  "Head Coach",
+  "Interim Head Coach",
+  "Associate Head Coach",
+  "Assistant Coach",
+  "___________",  # Fill in: What other coordinator role involves coaching?
+  "___________",  # Fill in: Another coordinator role
+  "___________"   # Fill in: Another coordinator role
+)
+
+# Filter to only coaching/recruiting/development positions
+# This includes any position with "coach", "recruiting", or "development" in the standardized title
+coaching_roles <- positions_standardized |>
+  filter(
+    str_detect(str_to_lower(position_title_standardized), "coach|recruiting|development")
+  ) |>
+  arrange(name, position_start)
+
+cat("Total coaching/recruiting/development position records:", nrow(coaching_roles), "\n")
+cat("Unique coaches with these positions:", n_distinct(coaching_roles$name), "\n")
+```
+
+---
+
+## Question 1: Head Coaches' Previous Positions
+
+**Research Question:** How many current or former Head Coaches were Associate Head Coaches in their immediate previous position versus Assistant Coaches?
+
+```{r head-coach-previous-positions}
+# Step 1: Identify all head coaching positions
+head_coach_positions <- coaching_roles |>
+  filter(position_title_standardized == "Head Coach") |>
+  select(coach_id, name, position_college, position_start, position_end)
+
+cat("Found", nrow(head_coach_positions), "head coaching positions\n")
+
+# Step 2: For each head coach position, find their immediately previous position
+# We'll create a dataset with each head coach position and their previous role
+head_coach_with_previous <- coaching_roles |>
+  # Order positions by coach and time
+  arrange(name, position_start) |>
+  # For each coach, add a column with the next position's standardized title
+  group_by(name) |>
+  mutate(next_position = lead(position_title_standardized)) |>
+  ungroup() |>
+  # Filter to positions where the NEXT position was Head Coach
+  filter(next_position == "___________")  # EXERCISE: Fill in the position type
+
+# Step 3: Count previous positions before becoming head coach
+previous_position_counts <- head_coach_with_previous |>
+  count(position_title_standardized, sort = TRUE)
+
+cat("\nPositions held immediately before becoming Head Coach:\n")
+print(previous_position_counts, n = 20)
+
+# Step 4: Compare Associate Head Coach vs Assistant Coach specifically
+associate_count <- previous_position_counts |>
+  filter(position_title_standardized == "Associate Head Coach") |>
+  pull(n) |>
+  sum()
+
+assistant_count <- previous_position_counts |>
+  filter(position_title_standardized == "___________") |>  # EXERCISE: Fill in
+  pull(n) |>
+  sum()
+
+cat("\n=== Key Finding ===\n")
+cat("Associate Head Coach → Head Coach:", associate_count, "\n")
+cat("Assistant Coach → Head Coach:", assistant_count, "\n")
+cat("Ratio (Associate:Assistant):",
+    round(associate_count / assistant_count, 2), ":1\n")
+```
+
+### Interpretation
+
+**EXERCISE:** Based on the results above, write 2-3 sentences interpreting what this tells us about the typical career path to becoming a head coach. Which position is more common as a stepping stone?
+
+---
+
+## Question 2: Head Coaches with Recruiting Experience
+
+**Research Question:** How many Head Coaches previously held positions with "recruiting" in the title?
+
+```{r head-coaches-recruiting-background}
+# Step 1: Identify coaches who have been head coaches
+head_coaches_list <- coaching_roles |>
+  filter(position_title_standardized == "Head Coach") |>
+  distinct(name) |>
+  pull(name)
+
+cat("Unique individuals who have been head coaches:", length(head_coaches_list), "\n")
+
+# Step 2: For these head coaches, check if they ever had a recruiting position
+# EXERCISE: Complete the filter condition to find recruiting-related positions
+recruiting_positions_keywords <- "recruiting"  # This will match any position with "recruiting"
+
+head_coaches_with_recruiting <- coaching_roles |>
+  filter(name %in% head_coaches_list) |>
+  # Check if position title (original) contains recruiting keywords
+  filter(str_detect(str_to_lower(position_title_original), recruiting_positions_keywords)) |>
+  distinct(name)
+
+# Count results
+num_with_recruiting <- nrow(head_coaches_with_recruiting)
+num_without_recruiting <- length(head_coaches_list) - num_with_recruiting
+percentage_with_recruiting <- round(num_with_recruiting / length(head_coaches_list) * 100, 1)
+
+cat("\n=== Recruiting Experience Analysis ===\n")
+cat("Head coaches who previously had recruiting positions:", num_with_recruiting, "\n")
+cat("Head coaches without recruiting positions in their history:", num_without_recruiting, "\n")
+cat("Percentage with recruiting experience:", percentage_with_recruiting, "%\n")
+
+# Show examples of recruiting positions held by future head coaches
+cat("\nExamples of recruiting positions held by head coaches:\n")
+coaching_roles |>
+  filter(name %in% head_coaches_with_recruiting$name) |>
+  filter(str_detect(str_to_lower(position_title_original), recruiting_positions_keywords)) |>
+  select(name, position_title_original, position_college, position_start) |>
+  head(10) |>
+  print()
+```
+
+### Reflection Question
+
+**EXERCISE:** Why might recruiting experience be valuable (or not valuable) for someone aspiring to become a head coach? Write a brief response below based on the data and your understanding of coaching.
+
+---
+
+## Question 3: Common Career Pathways
+
+**Research Question:** What are the most common career pathways to becoming a head coach?
+
+```{r common-pathways}
+# Create career sequences for all coaches who became head coaches
+# We'll look at the full sequence of positions for each person
+
+career_sequences <- coaching_roles |>
+  # Filter to people who eventually became head coaches
+  filter(name %in% head_coaches_list) |>
+  # Order by time
+  arrange(name, position_start) |>
+  # Group by person
+  group_by(name) |>
+  # Create a sequence of positions as a string
+  summarize(
+    career_path = paste(position_title_standardized, collapse = " → "),
+    num_positions = n(),
+    .groups = "drop"
+  )
+
+# EXERCISE: Find the most common career paths
+# Count how many coaches followed each unique pathway
+pathway_frequencies <- career_sequences |>
+  count(career_path, sort = TRUE)
+
+cat("Total unique career pathways to head coach:", nrow(pathway_frequencies), "\n\n")
+cat("Top 15 most common career pathways:\n")
+print(pathway_frequencies |> head(15), n = 15)
+
+# Analyze pathway lengths
+cat("\n=== Career Path Length Analysis ===\n")
+career_sequences |>
+  count(num_positions) |>
+  arrange(num_positions) |>
+  mutate(percentage = round(n / sum(n) * 100, 1)) |>
+  print(n = 20)
+```
+
+### Common Patterns: Two-Step Pathways
+
+Let's focus on the most direct pathways - those with exactly 2 positions ending in Head Coach:
+
+```{r two-step-pathways}
+# EXERCISE: Filter career sequences to only those with 2 positions
+# (meaning one position before becoming head coach)
+two_step_paths <- career_sequences |>
+  filter(num_positions == ___)  # EXERCISE: Fill in the number
+
+# Count and display
+two_step_frequencies <- two_step_paths |>
+  count(career_path, sort = TRUE)
+
+cat("Coaches with exactly one previous position before head coach:",
+    nrow(two_step_paths), "\n\n")
+cat("Most common 2-step pathways:\n")
+print(two_step_frequencies |> head(10), n = 10)
+```
+
+### Common Patterns: Three-Step Pathways
+
+Now let's look at three-position careers:
+
+```{r three-step-pathways}
+# Filter to three-step pathways
+three_step_paths <- career_sequences |>
+  filter(num_positions == 3)
+
+three_step_frequencies <- three_step_paths |>
+  count(career_path, sort = TRUE)
+
+cat("Coaches with exactly two previous positions before head coach:",
+    nrow(three_step_paths), "\n\n")
+cat("Most common 3-step pathways:\n")
+print(three_step_frequencies |> head(10), n = 10)
+```
+
+---
+
+## Position Transition Analysis
+
+Let's analyze which position transitions are most common, regardless of where they occur in a career.
+
+```{r position-transitions}
+# For each person, create pairs of consecutive positions
+# This shows us "Position A → Position B" transition frequencies
+
+position_transitions <- coaching_roles |>
+  arrange(name, position_start) |>
+  group_by(name) |>
+  mutate(
+    next_position = lead(position_title_standardized),
+    transition = paste(position_title_standardized, "→", next_position)
+  ) |>
+  ungroup() |>
+  # Remove the last position for each person (no transition after it)
+  filter(!is.na(next_position))
+
+# Count transition frequencies
+transition_frequencies <- position_transitions |>
+  count(transition, sort = TRUE)
+
+cat("Total position transitions:", nrow(position_transitions), "\n\n")
+cat("Top 20 most common position transitions:\n")
+print(transition_frequencies |> head(20), n = 20)
+
+# EXERCISE: Filter to only transitions that END in "Head Coach"
+transitions_to_head_coach <- transition_frequencies |>
+  filter(str_detect(transition, "→ ___________"))  # EXERCISE: Fill in
+
+cat("\n=== Transitions specifically to Head Coach ===\n")
+print(transitions_to_head_coach, n = 20)
+```
+
+---
+
+## Visualization: Career Pathway Sankey Diagram Data
+
+To visualize career pathways, we can prepare data for a Sankey diagram. This shows the flow of people between different positions.
+
+```{r sankey-prep}
+# Prepare data for first transition (Position 1 → Position 2)
+first_transitions <- coaching_roles |>
+  filter(name %in% head_coaches_list) |>
+  arrange(name, position_start) |>
+  group_by(name) |>
+  mutate(position_sequence = row_number()) |>
+  ungroup() |>
+  filter(position_sequence <= 2) |>
+  select(name, position_sequence, position_title_standardized) |>
+  pivot_wider(
+    names_from = position_sequence,
+    values_from = position_title_standardized,
+    names_prefix = "position_"
+  ) |>
+  filter(!is.na(position_1) & !is.na(position_2))
+
+# Count flows from position 1 to position 2
+first_transition_counts <- first_transitions |>
+  count(position_1, position_2, name = "count", sort = TRUE)
+
+cat("First career transitions for eventual head coaches:\n")
+print(first_transition_counts |> head(15), n = 15)
+
+# EXERCISE: Create similar data for position_2 → position_3 transitions
+# This will show the second career move for people who had at least 3 positions
+```
+
+---
+
+## Development and Operations Roles
+
+Let's also look at coaches who came through "development" or "operations" pathways:
+
+```{r development-operations-pathways}
+# Identify coaches who held Director of Player Development or
+# Director of Basketball Operations roles
+
+development_ops_positions <- c(
+  "Director of Player Development",
+  "Director of Basketball Operations"
+)
+
+# Find head coaches who previously held these positions
+head_coaches_from_dev_ops <- coaching_roles |>
+  filter(name %in% head_coaches_list) |>
+  filter(position_title_standardized %in% development_ops_positions) |>
+  distinct(name)
+
+cat("Head coaches who previously held development/operations roles:",
+    nrow(head_coaches_from_dev_ops), "\n")
+cat("Percentage:",
+    round(nrow(head_coaches_from_dev_ops) / length(head_coaches_list) * 100, 1),
+    "%\n\n")
+
+# Show their career paths
+cat("Sample career paths through development/operations:\n")
+career_sequences |>
+  filter(name %in% head_coaches_from_dev_ops$name) |>
+  head(10) |>
+  print()
+```
+
+---
+
+## Summary: Key Findings
+
+Based on this analysis, we can identify several key patterns in coaching career pathways:
+
+**EXERCISE:** Based on all the analyses above, write a summary that answers:
+
+1. What is the most common immediate previous position for someone becoming a head coach?
+2. How important is recruiting experience for head coaches?
+3. What are the 2-3 most common career pathways to becoming a head coach?
+4. Are there any "non-traditional" pathways that appear in the data?
+
+Write your findings here:
+
+```
+[Student response]
+```
+
+---
+
+## Extension Exercise: Your Own Analysis
+
+**EXERCISE:** Choose one of the following questions to explore with additional code:
+
+1. Do career pathways differ by conference or school type?
+2. How has the typical career pathway changed over time (comparing coaches who became head coaches in different decades)?
+3. What's the average number of years spent in each position type before advancing?
+4. Are there differences in career pathways for coaches at Power 5 vs mid-major programs?
+
+Add your code and analysis below:
+
+```{r extension-analysis}
+# Your code here
+
+
+```
